@@ -5,33 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-test("SPA contains the Release Hub sections", async () => {
-  const [app, html] = await Promise.all([
-    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../index.html", import.meta.url), "utf8"),
-  ]);
-  assert.match(app, /作業タイムチャート/);
-  assert.match(app, /リリース作業一覧/);
-  assert.match(app, /リリース作業を登録/);
-  assert.match(app, /ガント/);
-  assert.match(app, /当日体制/);
-  assert.match(app, /対応開始日時/);
-  assert.match(app, /電話番号/);
-  assert.match(app, /開始日時/);
-  assert.match(app, /作業情報を編集/);
-  assert.match(app, /コンチプラン/);
-  assert.match(app, /ドラッグして並べ替え/);
-  assert.match(app, /統合/);
-  assert.match(app, /申請物一覧/);
-  assert.match(app, /手順書・関連リンク/);
-  assert.match(app, /PreviewModal/);
-  assert.match(app, /target="_blank"/);
-  assert.match(app, /リンクを開く/);
-  assert.match(app, /release-hub-splash\.png/);
-  assert.match(html, /Release Hub \| リリース情報をひとつに/);
-});
-
-test("Node API creates a release work before persisting its details", async (context) => {
+async function startServer(context) {
   const dataDir = await mkdtemp(join(tmpdir(), "release-hub-test-"));
   const child = spawn(process.execPath, ["server/main.mjs"], {
     cwd: new URL("..", import.meta.url),
@@ -40,9 +14,11 @@ test("Node API creates a release work before persisting its details", async (con
   });
   context.after(() => child.kill());
 
-  const baseUrl = await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("Server start timed out")), 5000);
+  return new Promise((resolve, reject) => {
+    let errors = "";
+    const timer = setTimeout(() => reject(new Error(`Server start timed out: ${errors}`)), 5000);
     child.once("error", reject);
+    child.stderr.on("data", (chunk) => { errors += String(chunk); });
     child.stdout.on("data", (chunk) => {
       const match = String(chunk).match(/http:\/\/[^:]+:(\d+)/);
       if (match) {
@@ -51,43 +27,140 @@ test("Node API creates a release work before persisting its details", async (con
       }
     });
   });
+}
 
-  const initial = await fetch(`${baseUrl}/api/releases`).then((response) => response.json());
-  assert.equal(initial.length, 1);
-  assert.equal(initial[0].name, "決済基盤アップデート");
+async function requestJson(url, init) {
+  const response = await fetch(url, init);
+  return { response, body: await response.json() };
+}
 
-  const created = await fetch(`${baseUrl}/api/releases`, {
+async function createRelease(baseUrl, overrides = {}) {
+  const { response, body } = await requestJson(`${baseUrl}/api/releases`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-forwarded-user": "test-user" },
-    body: JSON.stringify({ name: "会員基盤リリース", version: "v1.3.0", releaseDate: "2026-08-01 21:00", environment: "Production", manager: "山田" }),
-  }).then((response) => response.json());
-  assert.equal(created.release.id, 2);
-  assert.equal(created.timeline.length, 0);
-  assert.equal(created.staffing.length, 0);
+    body: JSON.stringify({ name: "会員基盤リリース", version: "v1.3.0", releaseDate: "2026-08-01 22:00", environment: "Production", manager: "山田", ...overrides }),
+  });
+  assert.equal(response.status, 201);
+  return body;
+}
 
-  created.timeline.push({ id: 1, time: "21:00", endTime: "21:30", title: "デプロイ", owner: "山田", status: "完了" });
-  created.staffing.push({ id: 1, name: "佐藤", startTime: "09:00", endTime: "17:00", location: "名古屋", note: "現地対応" });
-  const saved = await fetch(`${baseUrl}/api/releases/2`, {
+async function saveRelease(baseUrl, work) {
+  return requestJson(`${baseUrl}/api/releases/${work.release.id}`, {
     method: "PUT",
     headers: { "content-type": "application/json", "x-forwarded-user": "test-user" },
-    body: JSON.stringify(created),
-  }).then((response) => response.json());
-  assert.equal(saved.timeline[0].title, "デプロイ");
-  assert.equal(saved.timeline[0].startAt, "2026-08-01T21:00");
-  assert.equal(saved.timeline[0].endAt, "2026-08-01T21:30");
+    body: JSON.stringify(work),
+  });
+}
+
+test("SPA contains editable release-operation controls", async () => {
+  const [app, html] = await Promise.all([
+    readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+  ]);
+  for (const label of ["作業タイムチャート", "リリース作業一覧", "リリース作業を登録", "ガント", "当日体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "統合", "申請物一覧", "手順書・関連リンク", "リンクを開く"]) {
+    assert.match(app, new RegExp(label));
+  }
+  assert.match(app, /PreviewModal/);
+  assert.match(app, /target="_blank"/);
+  assert.match(app, /release-hub-splash\.png/);
+  assert.match(html, /Release Hub \| リリース情報をひとつに/);
+});
+
+test("GitHub Pages workflow builds the demo with required deployment settings", async () => {
+  const workflow = await readFile(new URL("../.github/workflows/pages.yml", import.meta.url), "utf8");
+  assert.match(workflow, /branches: \[main\]/);
+  assert.match(workflow, /pages: write/);
+  assert.match(workflow, /id-token: write/);
+  assert.match(workflow, /VITE_BASE_PATH: \/release-hub\//);
+  assert.match(workflow, /VITE_DEMO_MODE: "true"/);
+  assert.match(workflow, /actions\/upload-pages-artifact@v4/);
+  assert.match(workflow, /actions\/deploy-pages@v4/);
+  assert.match(workflow, /needs: build/);
+});
+
+test("Node API migrates legacy time-only details across midnight", async (context) => {
+  const baseUrl = await startServer(context);
+  const created = await createRelease(baseUrl);
+  created.timeline.push(
+    { id: 1, time: "23:50", endTime: "00:10", title: "デプロイ", owner: "山田", status: "完了" },
+    { id: 2, time: "00:15", endTime: "00:45", title: "翌日確認", owner: "山田", status: "未着手" },
+  );
+  created.staffing.push({ id: 1, name: "佐藤", startTime: "21:00", endTime: "01:00", location: "名古屋", note: "現地対応" });
+
+  const { response, body: saved } = await saveRelease(baseUrl, created);
+  assert.equal(response.status, 200);
+  assert.deepEqual(saved.timeline.map(({ startAt, endAt }) => [startAt, endAt]), [
+    ["2026-08-01T23:50", "2026-08-02T00:10"],
+    ["2026-08-02T00:15", "2026-08-02T00:45"],
+  ]);
   assert.equal(saved.timeline[0].plan, "本線");
-  assert.equal(saved.staffing[0].startAt, "2026-08-01T09:00");
-  assert.equal(saved.staffing[0].endAt, "2026-08-01T17:00");
+  assert.equal(saved.staffing[0].startAt, "2026-08-01T21:00");
+  assert.equal(saved.staffing[0].endAt, "2026-08-02T01:00");
   assert.equal(saved.staffing[0].phone, "");
   assert.equal("time" in saved.timeline[0], false);
-  assert.equal(saved.release.updatedBy, "test-user");
+  assert.equal("startTime" in saved.staffing[0], false);
+});
 
-  const reloaded = await fetch(`${baseUrl}/api/releases/2`).then((response) => response.json());
-  assert.equal(reloaded.release.name, "会員基盤リリース");
-  assert.equal(reloaded.timeline.length, 1);
-  assert.equal(reloaded.staffing[0].location, "名古屋");
+test("Node API persists work edits, contact details, plan types, and timeline order", async (context) => {
+  const baseUrl = await startServer(context);
+  const initial = await requestJson(`${baseUrl}/api/releases`);
+  assert.equal(initial.response.status, 200);
+  assert.equal(initial.body[0].name, "決済基盤アップデート");
 
-  const summaries = await fetch(`${baseUrl}/api/releases`).then((response) => response.json());
-  assert.equal(summaries[0].id, 2);
-  assert.equal(summaries[0].progress, 100);
+  const created = await createRelease(baseUrl);
+  created.timeline = [
+    { id: 1, startAt: "2026-08-01T22:00", endAt: "2026-08-01T22:30", title: "本番デプロイ", owner: "山田", status: "完了", plan: "本線" },
+    { id: 2, startAt: "2026-08-01T22:30", endAt: "2026-08-01T23:00", title: "切り戻し", owner: "佐藤", status: "未着手", plan: "コンチプラン" },
+  ];
+  created.staffing = [{ id: 1, name: "佐藤", phone: "090-1111-2222", startAt: "2026-08-01T21:00", endAt: "2026-08-02T01:00", location: "オンコール", note: "一次連絡先" }];
+  let saved = (await saveRelease(baseUrl, created)).body;
+
+  saved.release.name = "会員基盤リリース（更新）";
+  saved.release.status = "進行中";
+  saved.release.manager = "佐藤";
+  saved.timeline.reverse();
+  saved.staffing[0].phone = "090-3333-4444";
+  const update = await saveRelease(baseUrl, saved);
+  assert.equal(update.response.status, 200);
+  assert.equal(update.body.release.updatedBy, "test-user");
+
+  const reloaded = await requestJson(`${baseUrl}/api/releases/${created.release.id}`);
+  assert.equal(reloaded.response.status, 200);
+  assert.equal(reloaded.body.release.name, "会員基盤リリース（更新）");
+  assert.equal(reloaded.body.release.status, "進行中");
+  assert.equal(reloaded.body.release.manager, "佐藤");
+  assert.deepEqual(reloaded.body.timeline.map((item) => item.id), [2, 1]);
+  assert.equal(reloaded.body.timeline[0].plan, "コンチプラン");
+  assert.equal(reloaded.body.staffing[0].phone, "090-3333-4444");
+
+  const summaries = await requestJson(`${baseUrl}/api/releases`);
+  assert.equal(summaries.body[0].id, created.release.id);
+  assert.equal(summaries.body[0].progress, 50);
+  assert.equal(summaries.body[0].status, "進行中");
+});
+
+test("Node API rejects invalid mutations and reports missing resources", async (context) => {
+  const baseUrl = await startServer(context);
+  const invalidCreate = await requestJson(`${baseUrl}/api/releases`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "項目不足" }),
+  });
+  assert.equal(invalidCreate.response.status, 400);
+
+  const created = await createRelease(baseUrl);
+  created.release.id = 999;
+  const mismatchedUpdate = await requestJson(`${baseUrl}/api/releases/2`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(created),
+  });
+  assert.equal(mismatchedUpdate.response.status, 400);
+
+  const missing = await requestJson(`${baseUrl}/api/releases/9999`);
+  assert.equal(missing.response.status, 404);
+  const unsupported = await requestJson(`${baseUrl}/api/releases`, { method: "DELETE" });
+  assert.equal(unsupported.response.status, 405);
+  const health = await requestJson(`${baseUrl}/health`);
+  assert.deepEqual(health.body, { status: "ok" });
 });
