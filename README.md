@@ -22,16 +22,10 @@ Node.js 20以上が必要です。
 
 ```bash
 npm ci
-npm run dev:api
-```
-
-別のターミナルで以下を実行します。
-
-```bash
 npm run dev
 ```
 
-画面は `http://localhost:5173`、APIは `http://localhost:4174` で起動します。Viteの開発サーバーが `/api` を自動転送します。
+SPAとNode APIが同時に起動します。画面は `http://localhost:5173`、APIは `http://localhost:4174` です。個別に起動する場合は、別々のターミナルで `npm run dev:web` と `npm run dev:api` を使用します。
 
 ## 本番起動
 

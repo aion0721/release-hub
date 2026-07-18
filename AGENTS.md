@@ -65,14 +65,11 @@ Node.js 20 or later is required.
 
 ```bash
 npm ci
-npm run dev:api
-```
-
-Run the SPA in another terminal:
-
-```bash
 npm run dev
 ```
+
+`npm run dev` starts both the SPA and Node API. To run them separately, use
+`npm run dev:api` and `npm run dev:web` in different terminals.
 
 Full verification:
 

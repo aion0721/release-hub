@@ -7,7 +7,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite",
     "dev:api": "node --watch server/main.mjs",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",

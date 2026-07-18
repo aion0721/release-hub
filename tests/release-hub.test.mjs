@@ -78,6 +78,16 @@ test("GitHub Pages workflow builds the demo with required deployment settings", 
   assert.match(workflow, /needs: build/);
 });
 
+test("development command starts both the SPA and Node API", async () => {
+  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const devScript = await readFile(new URL("../scripts/dev.mjs", import.meta.url), "utf8");
+  assert.equal(packageJson.scripts.dev, "node scripts/dev.mjs");
+  assert.equal(packageJson.scripts["dev:web"], "vite");
+  assert.match(devScript, /server\/main\.mjs/);
+  assert.match(devScript, /PORT: process\.env\.PORT \|\| "4174"/);
+  assert.match(devScript, /node_modules\/vite\/bin\/vite\.js/);
+});
+
 test("Node API migrates legacy time-only details across midnight", async (context) => {
   const baseUrl = await startServer(context);
   const created = await createRelease(baseUrl);
