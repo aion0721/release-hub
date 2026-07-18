@@ -242,11 +242,14 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .gantt-bar.plan-コンチプラン,.combined-bar.plan-コンチプラン { background-image:repeating-linear-gradient(135deg,#9a681c 0,#9a681c 8px,#bb8129 8px,#bb8129 16px); outline:2px dashed #f0b95e; outline-offset:-2px; }
 .gantt-bar:hover { filter:brightness(.94); }
 .gantt-bar.disabled { cursor:wait; opacity:.65; }
-.staffing-gantt-bar { position:absolute; top:9px; height:38px; display:grid; align-content:center; gap:1px; overflow:hidden; padding:0 9px; border:0; border-radius:6px; color:#fff; background:linear-gradient(100deg,#6342a6,#8463c3); text-align:left; cursor:pointer; box-shadow:0 3px 8px #3b236b26; }
-.staffing-gantt-bar strong,.staffing-gantt-bar span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.staffing-gantt-bar { position:absolute; top:9px; height:38px; overflow:hidden; border-radius:6px; color:#fff; background:linear-gradient(100deg,#6342a6,#8463c3); touch-action:none; user-select:none; box-shadow:0 3px 8px #3b236b26; }
+.staffing-gantt-bar.dragging { z-index:3; filter:brightness(1.06); }
+.staffing-gantt-content { width:100%; height:100%; display:grid; align-content:center; gap:1px; padding:0 11px; border:0; color:inherit; background:transparent; text-align:left; cursor:grab; touch-action:none; }
+.staffing-gantt-content:active { cursor:grabbing; }
+.staffing-gantt-bar strong,.staffing-gantt-bar span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .staffing-gantt-bar strong { font-size:9px; }
 .staffing-gantt-bar span { opacity:.82; font-size:8px; }
-.staffing-gantt-bar:disabled { cursor:wait; opacity:.65; }
+.staffing-gantt-bar.disabled { opacity:.65; }
 .list-hero { min-height:156px; display:grid; grid-template-columns:200px 180px 1fr; gap:1px; margin-bottom:18px; overflow:hidden; border-radius:12px; color:#fff; background:linear-gradient(115deg,#15304f,#1d4d7b); box-shadow:0 12px 32px #132c491c; }
 .list-hero>div { display:grid; align-content:center; padding:26px 30px; border-right:1px solid #ffffff15; }
 .list-hero>div:last-child { border:0; }
