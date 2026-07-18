@@ -1,0 +1,39 @@
+{
+  "releases": [
+    {
+      "release": {
+        "id": 1,
+        "name": "決済基盤アップデート",
+        "version": "v2.8.0",
+        "releaseDate": "2026-07-24 22:00",
+        "environment": "Production",
+        "status": "準備中",
+        "manager": "田中",
+        "updatedBy": "Release Team",
+        "updatedAt": ""
+      },
+      "timeline": [
+        { "id": 1, "startAt": "2026-07-24T21:30", "endAt": "2026-07-24T22:00", "title": "リリース開始判定", "owner": "田中", "status": "未着手", "plan": "本線" },
+        { "id": 2, "startAt": "2026-07-24T22:00", "endAt": "2026-07-24T22:10", "title": "メンテナンスモード切替", "owner": "佐藤", "status": "未着手", "plan": "本線" },
+        { "id": 3, "startAt": "2026-07-24T22:10", "endAt": "2026-07-24T22:30", "title": "アプリケーションデプロイ", "owner": "鈴木", "status": "未着手", "plan": "本線" },
+        { "id": 4, "startAt": "2026-07-24T22:30", "endAt": "2026-07-24T23:00", "title": "疎通・業務動作確認", "owner": "QAチーム", "status": "未着手", "plan": "本線" },
+        { "id": 5, "startAt": "2026-07-24T23:00", "endAt": "2026-07-24T23:15", "title": "完了判定・周知", "owner": "田中", "status": "未着手", "plan": "本線" }
+      ],
+      "staffing": [
+        { "id": 1, "name": "佐藤", "phone": "090-1234-5678", "startAt": "2026-07-24T09:00", "endAt": "2026-07-24T17:00", "location": "名古屋", "note": "現地対応" },
+        { "id": 2, "name": "田中", "phone": "080-1234-5678", "startAt": "2026-07-24T21:00", "endAt": "2026-07-25T01:00", "location": "オンコール", "note": "一次連絡先" }
+      ],
+      "approvals": [
+        { "id": 1, "title": "本番変更申請", "owner": "田中", "due": "7/22", "status": "承認済み", "url": "#" },
+        { "id": 2, "title": "メンテナンス告知", "owner": "佐藤", "due": "7/23", "status": "申請中", "url": "#" },
+        { "id": 3, "title": "リリース判定票", "owner": "鈴木", "due": "7/24", "status": "未申請", "url": "#" }
+      ],
+      "links": [
+        { "id": 1, "title": "本番リリース手順書", "description": "デプロイから確認までの標準手順", "category": "手順書", "url": "#" },
+        { "id": 2, "title": "切り戻し手順", "description": "障害発生時の復旧フロー", "category": "緊急時", "url": "#" },
+        { "id": 3, "title": "監視ダッシュボード", "description": "メトリクスとログを確認", "category": "監視", "url": "#" },
+        { "id": 4, "title": "リリースチケット", "description": "変更内容・レビュー履歴", "category": "チケット", "url": "#" }
+      ]
+    }
+  ]
+}
