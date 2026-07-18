@@ -292,7 +292,7 @@ function WorkList({ summaries, loading, onCreate, onOpen }: { summaries: Release
 }
 
 function WorkDetail({ work, loading, saving, onBack, onOpenModal, onOpenEditor, onOpenPreview, onReorderTimeline, onUpdateTimelineTime }: { work: ReleaseWork; loading: boolean; saving: boolean; onBack: () => void; onOpenModal: (type: ModalType) => void; onOpenEditor: (target: EditTarget) => void; onOpenPreview: (preview: PreviewItem) => void; onReorderTimeline: (sourceId: number, targetId: number | null, targetPlan: TimelinePlan) => void; onUpdateTimelineTime: (id: number, startAt: string, endAt: string) => void }) {
-  const [timelineView, setTimelineView] = useState<"list" | "gantt" | "combined">("list");
+  const [timelineView, setTimelineView] = useState<"list" | "gantt">("list");
   const progress = useMemo(() => work.timeline.length ? Math.round((work.timeline.filter((item) => item.status === "完了").length / work.timeline.length) * 100) : 0, [work.timeline]);
   const completed = work.timeline.filter((item) => item.status === "完了").length;
   const approved = work.approvals.filter((item) => item.status === "承認済み").length;
@@ -300,8 +300,7 @@ function WorkDetail({ work, loading, saving, onBack, onOpenModal, onOpenEditor, 
     <header className="topbar"><div><button className="back-button" onClick={onBack}>‹ 作業一覧</button><span className="eyebrow">RELEASE CONTROL CENTER</span><h1>{work.release.name}</h1></div><div className="top-actions"><span className={`live-dot ${saving ? "saving" : ""}`} /><span>{saving ? "保存中" : "共有済み"}</span><button className="ghost-button" onClick={() => onOpenEditor({ type: "work", item: work.release })}>作業情報を編集</button><button className="primary-button" onClick={() => onOpenModal("timeline")}>＋ 作業明細を追加</button></div></header>
     <div id="overview" className="release-banner"><div className="release-main"><span className="status-pill">{work.release.status}</span><h2>{work.release.version}</h2><p>{work.release.environment} 環境</p></div><div className="release-meta"><div><span>実施日時</span><strong>{work.release.releaseDate}</strong></div><div><span>責任者</span><strong>{work.release.manager}</strong></div><div><span>作業進捗</span><strong>{progress}%</strong></div><div className="progress-track"><i style={{ width: `${progress}%` }} /></div></div></div>
     <div className="summary-grid"><article className="metric-card"><span className="metric-icon blue">◷</span><div><small>作業項目</small><strong>{work.timeline.length}</strong><em>件</em></div><p>{completed}件 完了</p></article><article className="metric-card"><span className="metric-icon purple">♙</span><div><small>当日体制</small><strong>{work.staffing.length}</strong><em>名</em></div><p>対応メンバー</p></article><article className="metric-card"><span className="metric-icon green">✓</span><div><small>申請・承認</small><strong>{approved}</strong><em>/{work.approvals.length}</em></div><p>承認済み</p></article><article className="metric-card"><span className="metric-icon amber">↗</span><div><small>関連資料</small><strong>{work.links.length}</strong><em>件</em></div><p>すぐにアクセス</p></article></div>
-    <StaffingPanel assignments={work.staffing} onAdd={() => onOpenModal("staffing")} onEdit={(item) => onOpenEditor({ type: "staffing", item })} />
-    <div className="workspace-grid"><section id="timeline" className={`panel timeline-panel ${timelineView !== "list" ? "gantt-panel" : ""}`}><div className="panel-heading"><div><span className="section-kicker">TIMELINE</span><h2>作業タイムチャート</h2><p className="timeline-drag-hint">{timelineView === "list" ? "行を上下にドラッグして並べ替え・区分変更" : timelineView === "gantt" ? "バーを左右に移動・両端をドラッグして時間変更（5分単位）" : "作業と当日体制を同じ時間軸で表示"}</p></div><div className="panel-actions"><div className="view-switch" aria-label="タイムチャート表示"><button className={timelineView === "list" ? "active" : ""} onClick={() => setTimelineView("list")} aria-pressed={timelineView === "list"}>☷ リスト</button><button className={timelineView === "gantt" ? "active" : ""} onClick={() => setTimelineView("gantt")} aria-pressed={timelineView === "gantt"}>▥ ガント</button><button className={timelineView === "combined" ? "active" : ""} onClick={() => setTimelineView("combined")} aria-pressed={timelineView === "combined"}>≋ 統合</button></div><button className="ghost-button" onClick={() => onOpenModal("timeline")}>＋ 追加</button></div></div>{timelineView === "list" ? <TimelineList items={work.timeline} disabled={loading || saving} onEdit={(item) => onOpenEditor({ type: "timeline", item })} onReorder={onReorderTimeline} /> : timelineView === "gantt" ? <GanttChart items={work.timeline} disabled={loading || saving} onEdit={(item) => onOpenEditor({ type: "timeline", item })} onTimeChange={onUpdateTimelineTime} /> : <CombinedSchedule items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEditTimeline={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} />}</section>
+    <div className="workspace-grid"><section id="timeline" className={`panel timeline-panel ${timelineView === "gantt" ? "gantt-panel" : ""}`}><div className="panel-heading"><div><span className="section-kicker">ALL-IN-ONE</span><h2>当日オペレーション</h2><p className="timeline-drag-hint">{timelineView === "list" ? "作業と当日体制を一覧で編集。作業行は上下にドラッグ可能" : "作業と当日体制を同じ時間軸で表示。作業時間は5分単位でドラッグ変更"}</p></div><div className="panel-actions"><div className="view-switch" aria-label="オールインワン表示"><button className={timelineView === "list" ? "active" : ""} onClick={() => setTimelineView("list")} aria-pressed={timelineView === "list"}>☷ リスト</button><button className={timelineView === "gantt" ? "active" : ""} onClick={() => setTimelineView("gantt")} aria-pressed={timelineView === "gantt"}>▥ ガント</button></div><button className="ghost-button" onClick={() => onOpenModal("staffing")}>＋ 体制</button><button className="primary-button compact-button" onClick={() => onOpenModal("timeline")}>＋ 作業</button></div></div>{timelineView === "list" ? <AllInOneList items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEditTimeline={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} onReorder={onReorderTimeline} /> : <GanttChart items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEdit={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} onTimeChange={onUpdateTimelineTime} />}</section>
       <section id="approvals" className="panel approvals-panel"><div className="panel-heading"><div><span className="section-kicker">APPROVALS</span><h2>申請物一覧</h2></div><button className="ghost-button" onClick={() => onOpenModal("approval")}>＋ 追加</button></div><div className="approval-list">{work.approvals.map((item) => <button type="button" key={item.id} className="approval-row" onClick={() => onOpenPreview({ type: "approval", item })} aria-label={`${item.title}の詳細を開く`}><span className={`check ${item.status === "承認済み" ? "checked" : ""}`}>{item.status === "承認済み" ? "✓" : ""}</span><span><strong>{item.title}</strong><small>{item.owner}・期限 {item.due}</small></span><span className={`tag status-${item.status}`}>{item.status}</span><span className="external-link">詳細を見る ›</span></button>)}{!work.approvals.length && <p className="section-empty">まだ申請物はありません</p>}</div></section></div>
     <section id="links" className="panel links-panel"><div className="panel-heading"><div><span className="section-kicker">RESOURCES</span><h2>手順書・関連リンク</h2></div><button className="ghost-button" onClick={() => onOpenModal("link")}>＋ 追加</button></div><div className="link-grid">{work.links.map((item) => <button type="button" key={item.id} className="link-card" onClick={() => onOpenPreview({ type: "link", item })} aria-label={`${item.title}の詳細を開く`}><span className="doc-icon">▤</span><span><small>{item.category}</small><strong>{item.title}</strong><p>{item.description}</p></span><b>›</b></button>)}</div>{!work.links.length && <p className="section-empty links-empty">まだリンクはありません</p>}</section>
     <footer>最終更新：{work.release.updatedAt || "未更新"} ・ {work.release.updatedBy}</footer>
@@ -353,64 +352,31 @@ function fromMinutes(minutes: number) {
   return new Date(minutes * 60_000).toISOString().slice(0, 16);
 }
 
-function StaffingPanel({ assignments, onAdd, onEdit }: { assignments: StaffingAssignment[]; onAdd: () => void; onEdit: (item: StaffingAssignment) => void }) {
-  const ranges = assignments.map((assignment) => {
-    const start = toMinutes(assignment.startAt);
-    return { assignment, start, end: toMinutes(assignment.endAt) };
-  });
-  const rangeStart = ranges.length ? Math.floor(Math.min(...ranges.map((range) => range.start)) / 60) * 60 : 0;
-  const rangeEnd = ranges.length ? Math.max(rangeStart + 60, Math.ceil(Math.max(...ranges.map((range) => range.end)) / 60) * 60) : 60;
-  const duration = rangeEnd - rangeStart;
-  const ticks = Array.from({ length: Math.floor(duration / 60) + 1 }, (_, index) => rangeStart + index * 60);
-
-  return <section id="staffing" className="panel staffing-panel"><div className="panel-heading"><div><span className="section-kicker">DAY-OF COVERAGE</span><h2>当日体制</h2></div><button className="ghost-button" onClick={onAdd}>＋ メンバーを追加</button></div>
-    {!assignments.length ? <p className="section-empty">まだ当日の体制は登録されていません</p> : <div className="staffing-scroll"><div className="staffing-chart" style={{ minWidth: `${Math.max(720, 250 + duration * 1.35)}px` }} role="group" aria-label={`${formatMinutes(rangeStart)}から${formatMinutes(rangeEnd)}までの当日体制`}>
-      <div className="staffing-corner">メンバー / 場所・待機形態</div><div className="staffing-axis">{ticks.map((tick) => <span key={tick} style={{ left: `${((tick - rangeStart) / duration) * 100}%` }}>{formatMinutes(tick)}</span>)}</div>
-      {ranges.map(({ assignment, start, end }) => <div className="staffing-row" key={assignment.id}><button type="button" className="staffing-label" onClick={() => onEdit(assignment)} aria-label={`${assignment.name}の体制を編集`}><span className="member-avatar">{assignment.name.slice(0, 1)}</span><span><strong>{assignment.name}</strong><small>{assignment.phone || "電話番号未登録"}</small><small>{assignment.location}{assignment.note ? `・${assignment.note}` : ""}</small></span></button><div className="staffing-lane" style={{ backgroundSize: `${100 / Math.max(1, ticks.length - 1)}% 100%` }}><button type="button" className="staffing-bar" onClick={() => onEdit(assignment)} style={{ left: `${((start - rangeStart) / duration) * 100}%`, width: `${Math.max(3, ((end - start) / duration) * 100)}%` }} title={`${assignment.name} ${formatDateTimeRange(assignment.startAt, assignment.endAt)} ${assignment.location}`}><strong>{assignment.location}</strong><span>{formatDateTimeRange(assignment.startAt, assignment.endAt)}</span></button></div></div>)}
-    </div></div>}
-  </section>;
-}
-
-function CombinedSchedule({ items, assignments, disabled, onEditTimeline, onEditStaffing }: { items: TimelineItem[]; assignments: StaffingAssignment[]; disabled: boolean; onEditTimeline: (item: TimelineItem) => void; onEditStaffing: (item: StaffingAssignment) => void }) {
-  if (!items.length && !assignments.length) return <p className="section-empty">統合表示する作業・体制がありません</p>;
-  const workRanges = items.map((item) => {
-    const start = toMinutes(item.startAt);
-    return { item, start, end: toMinutes(item.endAt) };
-  });
-  const staffingRanges = assignments.map((assignment) => {
-    const start = toMinutes(assignment.startAt);
-    return { assignment, start, end: toMinutes(assignment.endAt) };
-  });
-  const starts = [...workRanges.map((range) => range.start), ...staffingRanges.map((range) => range.start)];
-  const ends = [...workRanges.map((range) => range.end), ...staffingRanges.map((range) => range.end)];
-  const rangeStart = Math.floor(Math.min(...starts) / 60) * 60;
-  const rangeEnd = Math.max(rangeStart + 60, Math.ceil(Math.max(...ends) / 60) * 60);
-  const duration = rangeEnd - rangeStart;
-  const ticks = Array.from({ length: Math.floor(duration / 60) + 1 }, (_, index) => rangeStart + index * 60);
-  const laneStyle = { backgroundSize: `${100 / Math.max(1, ticks.length - 1)}% 100%` };
-
-  return <div className="combined-scroll"><div className="combined-chart" style={{ minWidth: `${Math.max(760, 255 + duration * 1.8)}px` }} role="group" aria-label={`${formatMinutes(rangeStart)}から${formatMinutes(rangeEnd)}までの作業と体制の統合チャート`}>
-    <div className="combined-corner">作業・メンバー</div><div className="combined-axis">{ticks.map((tick) => <span key={tick} style={{ left: `${((tick - rangeStart) / duration) * 100}%` }}>{formatMinutes(tick)}</span>)}</div>
-    <div className="combined-section-label">作業</div><div className="combined-section-line"><span>WORK</span></div>
-    {workRanges.map(({ item, start, end }) => <div className="combined-row" key={`work-${item.id}`}><div className="combined-label"><i className={`combined-dot work-dot status-${item.status}`} /><span><strong>{item.title}</strong><small>{item.plan}・{item.owner}・{formatDateTimeRange(item.startAt, item.endAt)}</small></span></div><div className="combined-lane" style={laneStyle}><button className={`combined-bar work-bar gantt-${item.status} plan-${item.plan}`} style={{ left: `${((start - rangeStart) / duration) * 100}%`, width: `${Math.max(2.5, ((end - start) / duration) * 100)}%` }} onClick={() => onEditTimeline(item)} disabled={disabled} aria-label={`${item.title}を編集`}><strong>{item.title}</strong><span>{item.plan}・{item.owner}</span></button></div></div>)}
-    <div className="combined-section-label">体制</div><div className="combined-section-line staffing-line"><span>STAFFING</span></div>
-    {staffingRanges.map(({ assignment, start, end }) => <div className="combined-row" key={`staff-${assignment.id}`}><div className="combined-label"><span className="member-avatar">{assignment.name.slice(0, 1)}</span><span><strong>{assignment.name}</strong><small>{assignment.location}・{formatDateTimeRange(assignment.startAt, assignment.endAt)}</small></span></div><div className="combined-lane" style={laneStyle}><button type="button" className="combined-bar staffing-combined-bar" style={{ left: `${((start - rangeStart) / duration) * 100}%`, width: `${Math.max(2.5, ((end - start) / duration) * 100)}%` }} onClick={() => onEditStaffing(assignment)} disabled={disabled} aria-label={`${assignment.name}の体制を編集`}><strong>{assignment.name}・{assignment.location}</strong><span>{assignment.note || formatDateTimeRange(assignment.startAt, assignment.endAt)}</span></button></div></div>)}
-  </div></div>;
+function AllInOneList({ items, assignments, disabled, onEditTimeline, onEditStaffing, onReorder }: { items: TimelineItem[]; assignments: StaffingAssignment[]; disabled: boolean; onEditTimeline: (item: TimelineItem) => void; onEditStaffing: (item: StaffingAssignment) => void; onReorder: (sourceId: number, targetId: number | null, targetPlan: TimelinePlan) => void }) {
+  return <div className="all-in-one-list">
+    <section className="operation-list-section"><div className="operation-subheading"><div><span className="operation-icon work">◷</span><h3>作業</h3></div><span>{items.length}件</span></div><TimelineList items={items} disabled={disabled} onEdit={onEditTimeline} onReorder={onReorder} /></section>
+    <section id="staffing" className="operation-list-section"><div className="operation-subheading"><div><span className="operation-icon staffing">♙</span><h3>当日体制</h3></div><span>{assignments.length}名</span></div>
+      {!assignments.length ? <p className="section-empty">まだ当日の体制は登録されていません</p> : <div className="staffing-compact-list">{assignments.map((assignment) => <button type="button" className="staffing-compact-row" key={assignment.id} onClick={() => onEditStaffing(assignment)} disabled={disabled} aria-label={`${assignment.name}の体制を編集`}><span className="member-avatar">{assignment.name.slice(0, 1)}</span><span className="staffing-person"><strong>{assignment.name}</strong><small>{assignment.phone || "電話番号未登録"}</small></span><span className="staffing-time"><strong>{formatDateTimeRange(assignment.startAt, assignment.endAt)}</strong><small>{assignment.location}{assignment.note ? `・${assignment.note}` : ""}</small></span><span className="row-arrow">›</span></button>)}</div>}
+    </section>
+  </div>;
 }
 
 type GanttDrag = { id: number; mode: "move" | "start" | "end"; pointerId: number; originX: number; start: number; end: number; currentStart: number; currentEnd: number; laneWidth: number; moved: boolean };
 
-function GanttChart({ items, disabled, onEdit, onTimeChange }: { items: TimelineItem[]; disabled: boolean; onEdit: (item: TimelineItem) => void; onTimeChange: (id: number, startAt: string, endAt: string) => void }) {
+function GanttChart({ items, assignments, disabled, onEdit, onEditStaffing, onTimeChange }: { items: TimelineItem[]; assignments: StaffingAssignment[]; disabled: boolean; onEdit: (item: TimelineItem) => void; onEditStaffing: (item: StaffingAssignment) => void; onTimeChange: (id: number, startAt: string, endAt: string) => void }) {
   const dragRef = useRef<GanttDrag | null>(null);
   const suppressClickRef = useRef(false);
   const [draftTimes, setDraftTimes] = useState<Record<number, { start: number; end: number }>>({});
-  if (!items.length) return <p className="section-empty">ガント表示する作業明細がありません</p>;
+  if (!items.length && !assignments.length) return <p className="section-empty">表示する作業・当日体制がありません</p>;
   const ranges = items.map((item) => {
     const start = toMinutes(item.startAt);
     return { item, start, end: toMinutes(item.endAt) };
   });
-  const rangeStart = Math.floor(Math.min(...ranges.map((range) => range.start)) / 60) * 60 - 60;
-  const rangeEnd = Math.max(rangeStart + 120, Math.ceil(Math.max(...ranges.map((range) => range.end)) / 60) * 60 + 60);
+  const staffingRanges = assignments.map((assignment) => ({ assignment, start: toMinutes(assignment.startAt), end: toMinutes(assignment.endAt) }));
+  const starts = [...ranges.map((range) => range.start), ...staffingRanges.map((range) => range.start)];
+  const ends = [...ranges.map((range) => range.end), ...staffingRanges.map((range) => range.end)];
+  const rangeStart = Math.floor(Math.min(...starts) / 60) * 60 - 60;
+  const rangeEnd = Math.max(rangeStart + 120, Math.ceil(Math.max(...ends) / 60) * 60 + 60);
   const duration = rangeEnd - rangeStart;
   const ticks = Array.from({ length: Math.floor(duration / 60) + 1 }, (_, index) => rangeStart + index * 60);
 
@@ -460,8 +426,9 @@ function GanttChart({ items, disabled, onEdit, onTimeChange }: { items: Timeline
     if (drag.moved) onTimeChange(drag.id, fromMinutes(drag.currentStart), fromMinutes(drag.currentEnd));
   }
 
-  return <div className="gantt-scroll"><div className="gantt-chart" style={{ minWidth: `${Math.max(620, 260 + duration * 2.1)}px` }} role="group" aria-label={`${formatMinutes(rangeStart)}から${formatMinutes(rangeEnd)}までの作業ガントチャート`}>
-    <div className="gantt-corner">作業 / 担当</div><div className="gantt-axis">{ticks.map((tick) => <span key={tick} style={{ left: `${((tick - rangeStart) / duration) * 100}%` }}>{formatMinutes(tick)}</span>)}</div>
+  return <div className="gantt-scroll"><div className="gantt-chart" style={{ minWidth: `${Math.max(760, 260 + duration * 1.35)}px` }} role="group" aria-label={`${formatMinutes(rangeStart)}から${formatMinutes(rangeEnd)}までの作業と当日体制`}>
+    <div className="gantt-corner">作業・メンバー / 時間</div><div className="gantt-axis">{ticks.map((tick) => <span key={tick} style={{ left: `${((tick - rangeStart) / duration) * 100}%` }}>{formatMinutes(tick)}</span>)}</div>
+    <div className="gantt-section-label"><span className="operation-icon work">◷</span>作業</div><div className="gantt-section-line"><span>WORK</span></div>
     {ranges.map(({ item, start: savedStart, end: savedEnd }) => {
       const draft = draftTimes[item.id];
       const start = draft?.start ?? savedStart;
@@ -469,6 +436,8 @@ function GanttChart({ items, disabled, onEdit, onTimeChange }: { items: Timeline
       const dragging = dragRef.current?.id === item.id;
       return <div className="gantt-row" key={item.id}><div className="gantt-label"><strong>{item.title}</strong><small>{item.plan}・{item.owner}・{formatDateTimeRange(fromMinutes(start), fromMinutes(end))}</small></div><div className="gantt-lane" style={{ backgroundSize: `${100 / Math.max(1, ticks.length - 1)}% 100%` }}><div className={`gantt-bar gantt-${item.status} plan-${item.plan} ${dragging ? "dragging" : ""} ${disabled ? "disabled" : ""}`} style={{ left: `${((start - rangeStart) / duration) * 100}%`, width: `${Math.max(2.5, ((end - start) / duration) * 100)}%` }}><button className="gantt-bar-content" onPointerDown={(event) => beginTimeDrag(event, item, "move", savedStart, savedEnd)} onPointerMove={moveTimeDrag} onPointerUp={endTimeDrag} onPointerCancel={endTimeDrag} onClick={() => { if (suppressClickRef.current) { suppressClickRef.current = false; return; } onEdit(item); }} disabled={disabled} aria-label={`${item.title}の時間帯をドラッグで移動。クリックで編集`} title="左右にドラッグして時間帯を移動"><span>{item.status === "完了" ? "✓ " : ""}{item.title}</span></button><button className="gantt-resize-handle start" onPointerDown={(event) => beginTimeDrag(event, item, "start", savedStart, savedEnd)} onPointerMove={moveTimeDrag} onPointerUp={endTimeDrag} onPointerCancel={endTimeDrag} disabled={disabled} aria-label={`${item.title}の開始時刻をドラッグで変更`} title="開始時刻を変更" /><button className="gantt-resize-handle end" onPointerDown={(event) => beginTimeDrag(event, item, "end", savedStart, savedEnd)} onPointerMove={moveTimeDrag} onPointerUp={endTimeDrag} onPointerCancel={endTimeDrag} disabled={disabled} aria-label={`${item.title}の終了時刻をドラッグで変更`} title="終了時刻を変更" /></div></div></div>;
     })}
+    <div id="staffing" className="gantt-section-label"><span className="operation-icon staffing">♙</span>当日体制</div><div className="gantt-section-line staffing"><span>STAFFING</span></div>
+    {staffingRanges.map(({ assignment, start, end }) => <div className="gantt-row" key={`staffing-${assignment.id}`}><div className="gantt-label staffing-gantt-label"><span className="member-avatar">{assignment.name.slice(0, 1)}</span><span><strong>{assignment.name}</strong><small>{assignment.phone || "電話番号未登録"}・{assignment.location}・{formatDateTimeRange(assignment.startAt, assignment.endAt)}</small></span></div><div className="gantt-lane" style={{ backgroundSize: `${100 / Math.max(1, ticks.length - 1)}% 100%` }}><button type="button" className="staffing-gantt-bar" style={{ left: `${((start - rangeStart) / duration) * 100}%`, width: `${Math.max(2.5, ((end - start) / duration) * 100)}%` }} onClick={() => onEditStaffing(assignment)} disabled={disabled} aria-label={`${assignment.name}の体制を編集`}><strong>{assignment.name}・{assignment.location}</strong><span>{assignment.note || formatDateTimeRange(assignment.startAt, assignment.endAt)}</span></button></div></div>)}
   </div></div>;
 }
 
