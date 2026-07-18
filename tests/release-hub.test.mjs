@@ -57,12 +57,15 @@ test("SPA contains editable release-operation controls", async () => {
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
     readFile(new URL("../index.html", import.meta.url), "utf8"),
   ]);
-  for (const label of ["作業タイムチャート", "リリース作業一覧", "リリース作業を登録", "ガント", "当日体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "統合", "申請物一覧", "申請物を編集", "手順書・関連リンク", "リンク情報を編集", "情報を編集", "リンクを開く"]) {
+  for (const label of ["作業タイムチャート", "リリース作業一覧", "リリース作業を登録", "ガント", "当日体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "行を上下にドラッグ", "両端をドラッグして時間変更", "統合", "申請物一覧", "申請物を編集", "手順書・関連リンク", "リンク情報を編集", "情報を編集", "リンクを開く"]) {
     assert.match(app, new RegExp(label));
   }
   assert.match(app, /PreviewModal/);
   assert.match(app, /target="_blank"/);
   assert.match(app, /release-hub-splash\.png/);
+  assert.match(app, /onTimeChange/);
+  assert.match(app, /gantt-resize-handle/);
+  assert.match(app, /Math\.round\(rawDelta \/ 5\) \* 5/);
   assert.match(html, /Release Hub \| リリース情報をひとつに/);
 });
 

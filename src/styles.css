@@ -76,10 +76,11 @@ button.nav-item { width:100%; border:0; background:transparent; text-align:left;
 .timeline-group.plan-コンチプラン { margin-top:10px; }
 .timeline-group.plan-コンチプラン .timeline-group-heading h3 { color:#9a6413; }
 .timeline-group-empty { margin:10px 0; color:#a1aab6; font-size:9px; }
-.timeline-row { width:100%; display:grid; grid-template-columns:18px 76px 36px minmax(0,1fr) auto; align-items:center; min-height:66px; padding:0; background:none; border:0; border-bottom:1px solid #eff2f5; text-align:left; cursor:pointer; }
+.timeline-drag-hint { margin:4px 0 0; color:#8a97a8; font-size:9px; }
+.timeline-row { width:100%; display:grid; grid-template-columns:18px 76px 36px minmax(0,1fr) auto; align-items:center; min-height:66px; padding:0; background:none; border:0; border-bottom:1px solid #eff2f5; text-align:left; cursor:grab; }
+.timeline-row:active { cursor:grabbing; }
 .timeline-row.dragging { opacity:.42; }
-.drag-handle { color:#a2adba; font-size:15px; cursor:grab; user-select:none; }
-.drag-handle:active { cursor:grabbing; }
+.drag-handle { color:#a2adba; font-size:15px; pointer-events:none; user-select:none; }
 .timeline-row:last-child { border:0; }
 .timeline-row:hover .task strong { color:#1f5bb3; }
 .timeline-row.done { opacity:.72; }
@@ -203,14 +204,21 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .gantt-label strong { overflow:hidden; color:#26384f; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
 .gantt-label small { color:#8a97a8; font-size:9px; }
 .gantt-lane { min-height:56px; position:relative; border-bottom:1px solid #edf1f5; background-image:linear-gradient(to right,#e8edf3 1px,transparent 1px); }
-.gantt-bar { position:absolute; top:13px; height:30px; overflow:hidden; padding:0 9px; border:0; border-radius:6px; color:#fff; text-align:left; cursor:pointer; box-shadow:0 3px 8px #173d6a22; }
+.gantt-bar { position:absolute; top:13px; height:30px; overflow:hidden; border-radius:6px; color:#fff; touch-action:none; user-select:none; box-shadow:0 3px 8px #173d6a22; }
+.gantt-bar.dragging { z-index:3; filter:brightness(1.05); }
+.gantt-bar-content { width:100%; height:100%; padding:0 11px; border:0; color:inherit; background:transparent; text-align:left; cursor:grab; touch-action:none; }
+.gantt-bar-content:active { cursor:grabbing; }
 .gantt-bar span { display:block; overflow:hidden; font-size:9px; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
+.gantt-resize-handle { position:absolute; top:0; bottom:0; z-index:2; width:8px; padding:0; border:0; background:#ffffff24; cursor:ew-resize; touch-action:none; }
+.gantt-resize-handle::after { content:""; position:absolute; top:8px; bottom:8px; left:3px; width:2px; border-radius:2px; background:#ffffffb8; }
+.gantt-resize-handle.start { left:0; }
+.gantt-resize-handle.end { right:0; }
 .gantt-未着手 { background:#75869a; }
 .gantt-進行中 { background:#d88813; }
 .gantt-完了 { background:#13996d; }
 .gantt-bar.plan-コンチプラン,.combined-bar.plan-コンチプラン { background-image:repeating-linear-gradient(135deg,#9a681c 0,#9a681c 8px,#bb8129 8px,#bb8129 16px); outline:2px dashed #f0b95e; outline-offset:-2px; }
 .gantt-bar:hover { filter:brightness(.94); }
-.gantt-bar:disabled { cursor:wait; opacity:.65; }
+.gantt-bar.disabled { cursor:wait; opacity:.65; }
 .list-hero { min-height:156px; display:grid; grid-template-columns:200px 180px 1fr; gap:1px; margin-bottom:18px; overflow:hidden; border-radius:12px; color:#fff; background:linear-gradient(115deg,#15304f,#1d4d7b); box-shadow:0 12px 32px #132c491c; }
 .list-hero>div { display:grid; align-content:center; padding:26px 30px; border-right:1px solid #ffffff15; }
 .list-hero>div:last-child { border:0; }

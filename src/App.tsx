@@ -1,4 +1,4 @@
-import { type DragEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createReleaseWork, fetchReleaseSummaries, fetchReleaseWork, saveReleaseWork } from "./api";
 import { sampleWork } from "./sampleData";
 import type { ApprovalItem, CreateReleaseInput, ReleaseSummary, ReleaseWork, ResourceLink, StaffingAssignment, TimelineItem, TimelinePlan, TimelineStatus } from "./types";
@@ -128,14 +128,29 @@ export default function App() {
     setEditTarget(null);
   }
 
-  function reorderTimeline(sourceId: number, targetId: number) {
-    if (!selected || sourceId === targetId) return;
+  function reorderTimeline(sourceId: number, targetId: number | null, targetPlan: TimelinePlan) {
+    if (!selected) return;
     const sourceIndex = selected.timeline.findIndex((item) => item.id === sourceId);
-    const targetIndex = selected.timeline.findIndex((item) => item.id === targetId);
-    if (sourceIndex < 0 || targetIndex < 0) return;
+    if (sourceIndex < 0) return;
+    const source = selected.timeline[sourceIndex];
+    if (sourceId === targetId && source.plan === targetPlan) return;
     const timeline = [...selected.timeline];
     const [moved] = timeline.splice(sourceIndex, 1);
-    timeline.splice(targetIndex, 0, moved);
+    const updated = { ...moved, plan: targetPlan };
+    if (targetId === null) {
+      const lastPlanIndex = timeline.reduce((last, item, index) => item.plan === targetPlan ? index : last, -1);
+      timeline.splice(lastPlanIndex + 1, 0, updated);
+    } else {
+      const targetIndex = timeline.findIndex((item) => item.id === targetId);
+      if (targetIndex < 0) return;
+      timeline.splice(targetIndex, 0, updated);
+    }
+    void commit({ ...selected, timeline });
+  }
+
+  function updateTimelineTime(id: number, startAt: string, endAt: string) {
+    if (!selected) return;
+    const timeline = selected.timeline.map((item) => item.id === id ? { ...item, startAt, endAt } : item);
     void commit({ ...selected, timeline });
   }
 
@@ -228,7 +243,7 @@ export default function App() {
       <section className="content">
         {error && <div className="error-banner">{error} — API起動前はサンプルデータを表示します</div>}
         {selected ? (
-          <WorkDetail work={selected} loading={loading} saving={saving} onBack={() => setSelected(null)} onOpenModal={openModal} onOpenEditor={openEditor} onOpenPreview={setPreview} onReorderTimeline={reorderTimeline} />
+          <WorkDetail work={selected} loading={loading} saving={saving} onBack={() => setSelected(null)} onOpenModal={openModal} onOpenEditor={openEditor} onOpenPreview={setPreview} onReorderTimeline={reorderTimeline} onUpdateTimelineTime={updateTimelineTime} />
         ) : (
           <WorkList summaries={summaries} loading={loading} onCreate={() => openModal("work")} onOpen={openWork} />
         )}
@@ -276,7 +291,7 @@ function WorkList({ summaries, loading, onCreate, onOpen }: { summaries: Release
   </>;
 }
 
-function WorkDetail({ work, loading, saving, onBack, onOpenModal, onOpenEditor, onOpenPreview, onReorderTimeline }: { work: ReleaseWork; loading: boolean; saving: boolean; onBack: () => void; onOpenModal: (type: ModalType) => void; onOpenEditor: (target: EditTarget) => void; onOpenPreview: (preview: PreviewItem) => void; onReorderTimeline: (sourceId: number, targetId: number) => void }) {
+function WorkDetail({ work, loading, saving, onBack, onOpenModal, onOpenEditor, onOpenPreview, onReorderTimeline, onUpdateTimelineTime }: { work: ReleaseWork; loading: boolean; saving: boolean; onBack: () => void; onOpenModal: (type: ModalType) => void; onOpenEditor: (target: EditTarget) => void; onOpenPreview: (preview: PreviewItem) => void; onReorderTimeline: (sourceId: number, targetId: number | null, targetPlan: TimelinePlan) => void; onUpdateTimelineTime: (id: number, startAt: string, endAt: string) => void }) {
   const [timelineView, setTimelineView] = useState<"list" | "gantt" | "combined">("list");
   const progress = useMemo(() => work.timeline.length ? Math.round((work.timeline.filter((item) => item.status === "完了").length / work.timeline.length) * 100) : 0, [work.timeline]);
   const completed = work.timeline.filter((item) => item.status === "完了").length;
@@ -286,21 +301,21 @@ function WorkDetail({ work, loading, saving, onBack, onOpenModal, onOpenEditor, 
     <div id="overview" className="release-banner"><div className="release-main"><span className="status-pill">{work.release.status}</span><h2>{work.release.version}</h2><p>{work.release.environment} 環境</p></div><div className="release-meta"><div><span>実施日時</span><strong>{work.release.releaseDate}</strong></div><div><span>責任者</span><strong>{work.release.manager}</strong></div><div><span>作業進捗</span><strong>{progress}%</strong></div><div className="progress-track"><i style={{ width: `${progress}%` }} /></div></div></div>
     <div className="summary-grid"><article className="metric-card"><span className="metric-icon blue">◷</span><div><small>作業項目</small><strong>{work.timeline.length}</strong><em>件</em></div><p>{completed}件 完了</p></article><article className="metric-card"><span className="metric-icon purple">♙</span><div><small>当日体制</small><strong>{work.staffing.length}</strong><em>名</em></div><p>対応メンバー</p></article><article className="metric-card"><span className="metric-icon green">✓</span><div><small>申請・承認</small><strong>{approved}</strong><em>/{work.approvals.length}</em></div><p>承認済み</p></article><article className="metric-card"><span className="metric-icon amber">↗</span><div><small>関連資料</small><strong>{work.links.length}</strong><em>件</em></div><p>すぐにアクセス</p></article></div>
     <StaffingPanel assignments={work.staffing} onAdd={() => onOpenModal("staffing")} onEdit={(item) => onOpenEditor({ type: "staffing", item })} />
-    <div className="workspace-grid"><section id="timeline" className={`panel timeline-panel ${timelineView !== "list" ? "gantt-panel" : ""}`}><div className="panel-heading"><div><span className="section-kicker">TIMELINE</span><h2>作業タイムチャート</h2></div><div className="panel-actions"><div className="view-switch" aria-label="タイムチャート表示"><button className={timelineView === "list" ? "active" : ""} onClick={() => setTimelineView("list")} aria-pressed={timelineView === "list"}>☷ リスト</button><button className={timelineView === "gantt" ? "active" : ""} onClick={() => setTimelineView("gantt")} aria-pressed={timelineView === "gantt"}>▥ ガント</button><button className={timelineView === "combined" ? "active" : ""} onClick={() => setTimelineView("combined")} aria-pressed={timelineView === "combined"}>≋ 統合</button></div><button className="ghost-button" onClick={() => onOpenModal("timeline")}>＋ 追加</button></div></div>{timelineView === "list" ? <TimelineList items={work.timeline} disabled={loading || saving} onEdit={(item) => onOpenEditor({ type: "timeline", item })} onReorder={onReorderTimeline} /> : timelineView === "gantt" ? <GanttChart items={work.timeline} disabled={loading || saving} onEdit={(item) => onOpenEditor({ type: "timeline", item })} /> : <CombinedSchedule items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEditTimeline={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} />}</section>
+    <div className="workspace-grid"><section id="timeline" className={`panel timeline-panel ${timelineView !== "list" ? "gantt-panel" : ""}`}><div className="panel-heading"><div><span className="section-kicker">TIMELINE</span><h2>作業タイムチャート</h2><p className="timeline-drag-hint">{timelineView === "list" ? "行を上下にドラッグして並べ替え・区分変更" : timelineView === "gantt" ? "バーを左右に移動・両端をドラッグして時間変更（5分単位）" : "作業と当日体制を同じ時間軸で表示"}</p></div><div className="panel-actions"><div className="view-switch" aria-label="タイムチャート表示"><button className={timelineView === "list" ? "active" : ""} onClick={() => setTimelineView("list")} aria-pressed={timelineView === "list"}>☷ リスト</button><button className={timelineView === "gantt" ? "active" : ""} onClick={() => setTimelineView("gantt")} aria-pressed={timelineView === "gantt"}>▥ ガント</button><button className={timelineView === "combined" ? "active" : ""} onClick={() => setTimelineView("combined")} aria-pressed={timelineView === "combined"}>≋ 統合</button></div><button className="ghost-button" onClick={() => onOpenModal("timeline")}>＋ 追加</button></div></div>{timelineView === "list" ? <TimelineList items={work.timeline} disabled={loading || saving} onEdit={(item) => onOpenEditor({ type: "timeline", item })} onReorder={onReorderTimeline} /> : timelineView === "gantt" ? <GanttChart items={work.timeline} disabled={loading || saving} onEdit={(item) => onOpenEditor({ type: "timeline", item })} onTimeChange={onUpdateTimelineTime} /> : <CombinedSchedule items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEditTimeline={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} />}</section>
       <section id="approvals" className="panel approvals-panel"><div className="panel-heading"><div><span className="section-kicker">APPROVALS</span><h2>申請物一覧</h2></div><button className="ghost-button" onClick={() => onOpenModal("approval")}>＋ 追加</button></div><div className="approval-list">{work.approvals.map((item) => <button type="button" key={item.id} className="approval-row" onClick={() => onOpenPreview({ type: "approval", item })} aria-label={`${item.title}の詳細を開く`}><span className={`check ${item.status === "承認済み" ? "checked" : ""}`}>{item.status === "承認済み" ? "✓" : ""}</span><span><strong>{item.title}</strong><small>{item.owner}・期限 {item.due}</small></span><span className={`tag status-${item.status}`}>{item.status}</span><span className="external-link">詳細を見る ›</span></button>)}{!work.approvals.length && <p className="section-empty">まだ申請物はありません</p>}</div></section></div>
     <section id="links" className="panel links-panel"><div className="panel-heading"><div><span className="section-kicker">RESOURCES</span><h2>手順書・関連リンク</h2></div><button className="ghost-button" onClick={() => onOpenModal("link")}>＋ 追加</button></div><div className="link-grid">{work.links.map((item) => <button type="button" key={item.id} className="link-card" onClick={() => onOpenPreview({ type: "link", item })} aria-label={`${item.title}の詳細を開く`}><span className="doc-icon">▤</span><span><small>{item.category}</small><strong>{item.title}</strong><p>{item.description}</p></span><b>›</b></button>)}</div>{!work.links.length && <p className="section-empty links-empty">まだリンクはありません</p>}</section>
     <footer>最終更新：{work.release.updatedAt || "未更新"} ・ {work.release.updatedBy}</footer>
   </>;
 }
 
-function TimelineList({ items, disabled, onEdit, onReorder }: { items: TimelineItem[]; disabled: boolean; onEdit: (item: TimelineItem) => void; onReorder: (sourceId: number, targetId: number) => void }) {
+function TimelineList({ items, disabled, onEdit, onReorder }: { items: TimelineItem[]; disabled: boolean; onEdit: (item: TimelineItem) => void; onReorder: (sourceId: number, targetId: number | null, targetPlan: TimelinePlan) => void }) {
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const plans: TimelinePlan[] = ["本線", "コンチプラン"];
   if (!items.length) return <p className="section-empty">まだ作業明細はありません</p>;
   return <div className="timeline-list">{plans.map((plan) => {
     const planItems = items.filter((item) => item.plan === plan);
-    return <section className={`timeline-group plan-${plan}`} key={plan}><div className="timeline-group-heading"><h3>{plan}</h3><span>{planItems.length}件</span></div>
-      {planItems.length ? planItems.map((item, index) => <button key={item.id} className={`timeline-row ${item.status === "完了" ? "done" : ""} ${draggingId === item.id ? "dragging" : ""}`} onClick={() => onEdit(item)} onDragOver={(event: DragEvent<HTMLButtonElement>) => event.preventDefault()} onDrop={(event: DragEvent<HTMLButtonElement>) => { event.preventDefault(); const sourceId = Number(event.dataTransfer.getData("text/plain")) || draggingId; const source = items.find((candidate) => candidate.id === sourceId); if (source && source.plan === item.plan) onReorder(source.id, item.id); setDraggingId(null); }} disabled={disabled} aria-label={`${item.title}を編集`}><span className="drag-handle" draggable={!disabled} onClick={(event) => event.stopPropagation()} onDragStart={(event: DragEvent<HTMLSpanElement>) => { event.stopPropagation(); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(item.id)); setDraggingId(item.id); }} onDragEnd={() => setDraggingId(null)} title="ドラッグして並べ替え">⋮⋮</span><span className="time">{formatDateTime(item.startAt)}</span><span className="line"><i>{item.status === "完了" ? "✓" : index + 1}</i></span><span className="task"><strong>{item.title}</strong><small>担当：{item.owner}・{formatDateTimeRange(item.startAt, item.endAt)}</small></span><span className={`tag status-${item.status}`}>{item.status}</span></button>) : <p className="timeline-group-empty">登録なし</p>}
+    return <section className={`timeline-group plan-${plan}`} key={plan} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const sourceId = Number(event.dataTransfer.getData("text/plain")) || draggingId; if (sourceId) onReorder(sourceId, null, plan); setDraggingId(null); }}><div className="timeline-group-heading"><h3>{plan}</h3><span>{planItems.length}件</span></div>
+      {planItems.length ? planItems.map((item, index) => <button key={item.id} draggable={!disabled} className={`timeline-row ${item.status === "完了" ? "done" : ""} ${draggingId === item.id ? "dragging" : ""}`} onClick={() => onEdit(item)} onDragStart={(event: DragEvent<HTMLButtonElement>) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(item.id)); setDraggingId(item.id); }} onDragEnd={() => setDraggingId(null)} onDragOver={(event: DragEvent<HTMLButtonElement>) => event.preventDefault()} onDrop={(event: DragEvent<HTMLButtonElement>) => { event.preventDefault(); event.stopPropagation(); const sourceId = Number(event.dataTransfer.getData("text/plain")) || draggingId; if (sourceId) onReorder(sourceId, item.id, plan); setDraggingId(null); }} disabled={disabled} aria-label={`${item.title}を編集`} title="ドラッグして並べ替え。クリックで編集"><span className="drag-handle">⋮⋮</span><span className="time">{formatDateTime(item.startAt)}</span><span className="line"><i>{item.status === "完了" ? "✓" : index + 1}</i></span><span className="task"><strong>{item.title}</strong><small>担当：{item.owner}・{formatDateTimeRange(item.startAt, item.endAt)}</small></span><span className={`tag status-${item.status}`}>{item.status}</span></button>) : <p className="timeline-group-empty">ここにドロップして移動</p>}
     </section>;
   })}</div>;
 }
@@ -332,6 +347,10 @@ function formatDateTimeRange(startAt: string, endAt: string) {
   const sameDay = start.year === end.year && start.month === end.month && start.day === end.day;
   const endText = sameDay ? `${String(end.hours).padStart(2, "0")}:${String(end.minutes).padStart(2, "0")}` : formatDateTime(endAt);
   return `${formatDateTime(startAt)}–${endText}`;
+}
+
+function fromMinutes(minutes: number) {
+  return new Date(minutes * 60_000).toISOString().slice(0, 16);
 }
 
 function StaffingPanel({ assignments, onAdd, onEdit }: { assignments: StaffingAssignment[]; onAdd: () => void; onEdit: (item: StaffingAssignment) => void }) {
@@ -379,20 +398,77 @@ function CombinedSchedule({ items, assignments, disabled, onEditTimeline, onEdit
   </div></div>;
 }
 
-function GanttChart({ items, disabled, onEdit }: { items: TimelineItem[]; disabled: boolean; onEdit: (item: TimelineItem) => void }) {
+type GanttDrag = { id: number; mode: "move" | "start" | "end"; pointerId: number; originX: number; start: number; end: number; currentStart: number; currentEnd: number; laneWidth: number; moved: boolean };
+
+function GanttChart({ items, disabled, onEdit, onTimeChange }: { items: TimelineItem[]; disabled: boolean; onEdit: (item: TimelineItem) => void; onTimeChange: (id: number, startAt: string, endAt: string) => void }) {
+  const dragRef = useRef<GanttDrag | null>(null);
+  const suppressClickRef = useRef(false);
+  const [draftTimes, setDraftTimes] = useState<Record<number, { start: number; end: number }>>({});
   if (!items.length) return <p className="section-empty">ガント表示する作業明細がありません</p>;
   const ranges = items.map((item) => {
     const start = toMinutes(item.startAt);
     return { item, start, end: toMinutes(item.endAt) };
   });
-  const rangeStart = Math.floor(Math.min(...ranges.map((range) => range.start)) / 60) * 60;
-  const rangeEnd = Math.max(rangeStart + 60, Math.ceil(Math.max(...ranges.map((range) => range.end)) / 60) * 60);
+  const rangeStart = Math.floor(Math.min(...ranges.map((range) => range.start)) / 60) * 60 - 60;
+  const rangeEnd = Math.max(rangeStart + 120, Math.ceil(Math.max(...ranges.map((range) => range.end)) / 60) * 60 + 60);
   const duration = rangeEnd - rangeStart;
   const ticks = Array.from({ length: Math.floor(duration / 60) + 1 }, (_, index) => rangeStart + index * 60);
 
+  function beginTimeDrag(event: ReactPointerEvent<HTMLElement>, item: TimelineItem, mode: GanttDrag["mode"], start: number, end: number) {
+    if (disabled) return;
+    const lane = event.currentTarget.closest(".gantt-lane");
+    if (!(lane instanceof HTMLElement)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = { id: item.id, mode, pointerId: event.pointerId, originX: event.clientX, start, end, currentStart: start, currentEnd: end, laneWidth: lane.getBoundingClientRect().width, moved: false };
+    setDraftTimes((current) => ({ ...current, [item.id]: { start, end } }));
+  }
+
+  function moveTimeDrag(event: ReactPointerEvent<HTMLElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const rawDelta = ((event.clientX - drag.originX) / Math.max(1, drag.laneWidth)) * duration;
+    const delta = Math.round(rawDelta / 5) * 5;
+    let start = drag.start;
+    let end = drag.end;
+    if (drag.mode === "move") {
+      const boundedDelta = Math.max(rangeStart - drag.start, Math.min(rangeEnd - drag.end, delta));
+      start += boundedDelta;
+      end += boundedDelta;
+    } else if (drag.mode === "start") {
+      start = Math.max(rangeStart, Math.min(drag.end - 5, drag.start + delta));
+    } else {
+      end = Math.min(rangeEnd, Math.max(drag.start + 5, drag.end + delta));
+    }
+    drag.moved ||= start !== drag.start || end !== drag.end;
+    drag.currentStart = start;
+    drag.currentEnd = end;
+    setDraftTimes((current) => ({ ...current, [drag.id]: { start, end } }));
+  }
+
+  function endTimeDrag(event: ReactPointerEvent<HTMLElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.mode === "move" && drag.moved) suppressClickRef.current = true;
+    dragRef.current = null;
+    setDraftTimes((current) => {
+      const next = { ...current };
+      delete next[drag.id];
+      return next;
+    });
+    if (drag.moved) onTimeChange(drag.id, fromMinutes(drag.currentStart), fromMinutes(drag.currentEnd));
+  }
+
   return <div className="gantt-scroll"><div className="gantt-chart" style={{ minWidth: `${Math.max(620, 260 + duration * 2.1)}px` }} role="group" aria-label={`${formatMinutes(rangeStart)}から${formatMinutes(rangeEnd)}までの作業ガントチャート`}>
     <div className="gantt-corner">作業 / 担当</div><div className="gantt-axis">{ticks.map((tick) => <span key={tick} style={{ left: `${((tick - rangeStart) / duration) * 100}%` }}>{formatMinutes(tick)}</span>)}</div>
-    {ranges.map(({ item, start, end }) => <div className="gantt-row" key={item.id}><div className="gantt-label"><strong>{item.title}</strong><small>{item.plan}・{item.owner}・{formatDateTimeRange(item.startAt, item.endAt)}</small></div><div className="gantt-lane" style={{ backgroundSize: `${100 / Math.max(1, ticks.length - 1)}% 100%` }}><button className={`gantt-bar gantt-${item.status} plan-${item.plan}`} style={{ left: `${((start - rangeStart) / duration) * 100}%`, width: `${Math.max(2.5, ((end - start) / duration) * 100)}%` }} onClick={() => onEdit(item)} disabled={disabled} aria-label={`${item.title}を編集`}><span>{item.status === "完了" ? "✓ " : ""}{item.title}</span></button></div></div>)}
+    {ranges.map(({ item, start: savedStart, end: savedEnd }) => {
+      const draft = draftTimes[item.id];
+      const start = draft?.start ?? savedStart;
+      const end = draft?.end ?? savedEnd;
+      const dragging = dragRef.current?.id === item.id;
+      return <div className="gantt-row" key={item.id}><div className="gantt-label"><strong>{item.title}</strong><small>{item.plan}・{item.owner}・{formatDateTimeRange(fromMinutes(start), fromMinutes(end))}</small></div><div className="gantt-lane" style={{ backgroundSize: `${100 / Math.max(1, ticks.length - 1)}% 100%` }}><div className={`gantt-bar gantt-${item.status} plan-${item.plan} ${dragging ? "dragging" : ""} ${disabled ? "disabled" : ""}`} style={{ left: `${((start - rangeStart) / duration) * 100}%`, width: `${Math.max(2.5, ((end - start) / duration) * 100)}%` }}><button className="gantt-bar-content" onPointerDown={(event) => beginTimeDrag(event, item, "move", savedStart, savedEnd)} onPointerMove={moveTimeDrag} onPointerUp={endTimeDrag} onPointerCancel={endTimeDrag} onClick={() => { if (suppressClickRef.current) { suppressClickRef.current = false; return; } onEdit(item); }} disabled={disabled} aria-label={`${item.title}の時間帯をドラッグで移動。クリックで編集`} title="左右にドラッグして時間帯を移動"><span>{item.status === "完了" ? "✓ " : ""}{item.title}</span></button><button className="gantt-resize-handle start" onPointerDown={(event) => beginTimeDrag(event, item, "start", savedStart, savedEnd)} onPointerMove={moveTimeDrag} onPointerUp={endTimeDrag} onPointerCancel={endTimeDrag} disabled={disabled} aria-label={`${item.title}の開始時刻をドラッグで変更`} title="開始時刻を変更" /><button className="gantt-resize-handle end" onPointerDown={(event) => beginTimeDrag(event, item, "end", savedStart, savedEnd)} onPointerMove={moveTimeDrag} onPointerUp={endTimeDrag} onPointerCancel={endTimeDrag} disabled={disabled} aria-label={`${item.title}の終了時刻をドラッグで変更`} title="終了時刻を変更" /></div></div></div>;
+    })}
   </div></div>;
 }
 
