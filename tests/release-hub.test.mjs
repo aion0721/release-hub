@@ -57,7 +57,7 @@ test("SPA contains editable release-operation controls", async () => {
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
     readFile(new URL("../index.html", import.meta.url), "utf8"),
   ]);
-  for (const label of ["作業タイムチャート", "リリース作業一覧", "リリース作業を登録", "ガント", "当日体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "統合", "申請物一覧", "手順書・関連リンク", "リンクを開く"]) {
+  for (const label of ["作業タイムチャート", "リリース作業一覧", "リリース作業を登録", "ガント", "当日体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "統合", "申請物一覧", "申請物を編集", "手順書・関連リンク", "リンク情報を編集", "情報を編集", "リンクを開く"]) {
     assert.match(app, new RegExp(label));
   }
   assert.match(app, /PreviewModal/);
@@ -123,6 +123,8 @@ test("Node API persists work edits, contact details, plan types, and timeline or
     { id: 2, startAt: "2026-08-01T22:30", endAt: "2026-08-01T23:00", title: "切り戻し", owner: "佐藤", status: "未着手", plan: "コンチプラン" },
   ];
   created.staffing = [{ id: 1, name: "佐藤", phone: "090-1111-2222", startAt: "2026-08-01T21:00", endAt: "2026-08-02T01:00", location: "オンコール", note: "一次連絡先" }];
+  created.approvals = [{ id: 1, title: "本番変更申請", owner: "佐藤", due: "8/1", status: "申請中", url: "https://example.com/approval" }];
+  created.links = [{ id: 1, title: "本番手順書", category: "手順書", description: "初版", url: "https://example.com/runbook" }];
   let saved = (await saveRelease(baseUrl, created)).body;
 
   saved.release.name = "会員基盤リリース（更新）";
@@ -130,6 +132,8 @@ test("Node API persists work edits, contact details, plan types, and timeline or
   saved.release.manager = "佐藤";
   saved.timeline.reverse();
   saved.staffing[0].phone = "090-3333-4444";
+  saved.approvals[0] = { ...saved.approvals[0], title: "本番変更申請（更新）", status: "承認済み" };
+  saved.links[0] = { ...saved.links[0], description: "改訂版", url: "https://example.com/runbook/v2" };
   const update = await saveRelease(baseUrl, saved);
   assert.equal(update.response.status, 200);
   assert.equal(update.body.release.updatedBy, "test-user");
@@ -142,6 +146,10 @@ test("Node API persists work edits, contact details, plan types, and timeline or
   assert.deepEqual(reloaded.body.timeline.map((item) => item.id), [2, 1]);
   assert.equal(reloaded.body.timeline[0].plan, "コンチプラン");
   assert.equal(reloaded.body.staffing[0].phone, "090-3333-4444");
+  assert.equal(reloaded.body.approvals[0].title, "本番変更申請（更新）");
+  assert.equal(reloaded.body.approvals[0].status, "承認済み");
+  assert.equal(reloaded.body.links[0].description, "改訂版");
+  assert.equal(reloaded.body.links[0].url, "https://example.com/runbook/v2");
 
   const summaries = await requestJson(`${baseUrl}/api/releases`);
   assert.equal(summaries.body[0].id, created.release.id);

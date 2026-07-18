@@ -5,7 +5,7 @@ import type { ApprovalItem, CreateReleaseInput, ReleaseSummary, ReleaseWork, Res
 
 type ModalType = "work" | "staffing" | "timeline" | "approval" | "link";
 type PreviewItem = { type: "approval"; item: ApprovalItem } | { type: "link"; item: ResourceLink };
-type EditTarget = { type: "work"; item: ReleaseWork["release"] } | { type: "staffing"; item: StaffingAssignment } | { type: "timeline"; item: TimelineItem };
+type EditTarget = { type: "work"; item: ReleaseWork["release"] } | { type: "staffing"; item: StaffingAssignment } | { type: "timeline"; item: TimelineItem } | { type: "approval"; item: ApprovalItem } | { type: "link"; item: ResourceLink };
 const demoMode = import.meta.env.VITE_DEMO_MODE === "true";
 
 function nextId(items: Array<{ id: number }>) {
@@ -118,6 +118,7 @@ export default function App() {
   }
 
   function openEditor(target: EditTarget) {
+    setPreview(null);
     setEditTarget(target);
     setModal(target.type);
   }
@@ -208,9 +209,13 @@ export default function App() {
       const item: TimelineItem = { id: editing?.id ?? nextId(selected.timeline), startAt: String(values.startAt), endAt: String(values.endAt), title: String(values.title), owner: String(values.owner), status: String(values.status || "未着手") as TimelineStatus, plan: String(values.plan || "本線") as TimelinePlan };
       nextWork = { ...selected, timeline: editing ? selected.timeline.map((row) => row.id === editing.id ? item : row) : [...selected.timeline, item] };
     } else if (modal === "approval") {
-      nextWork = { ...selected, approvals: [...selected.approvals, { id: nextId(selected.approvals), title: String(values.title), owner: String(values.owner), due: String(values.due), status: "未申請", url: String(values.url) }] };
+      const editing = editTarget?.type === "approval" ? editTarget.item : null;
+      const item: ApprovalItem = { id: editing?.id ?? nextId(selected.approvals), title: String(values.title), owner: String(values.owner), due: String(values.due), status: String(values.status || "未申請") as ApprovalItem["status"], url: String(values.url) };
+      nextWork = { ...selected, approvals: editing ? selected.approvals.map((row) => row.id === editing.id ? item : row) : [...selected.approvals, item] };
     } else {
-      nextWork = { ...selected, links: [...selected.links, { id: nextId(selected.links), title: String(values.title), category: String(values.category), description: String(values.description), url: String(values.url) }] };
+      const editing = editTarget?.type === "link" ? editTarget.item : null;
+      const item: ResourceLink = { id: editing?.id ?? nextId(selected.links), title: String(values.title), category: String(values.category), description: String(values.description), url: String(values.url) };
+      nextWork = { ...selected, links: editing ? selected.links.map((row) => row.id === editing.id ? item : row) : [...selected.links, item] };
     }
     closeModal();
     void commit(nextWork);
@@ -229,7 +234,7 @@ export default function App() {
         )}
       </section>
       {modal && <ItemModal type={modal} editTarget={editTarget} saving={saving} onClose={closeModal} onSubmit={submitItem} />}
-      {preview && <PreviewModal preview={preview} onClose={() => setPreview(null)} />}
+      {preview && <PreviewModal preview={preview} onClose={() => setPreview(null)} onEdit={(target) => openEditor(target)} />}
     </main>
   );
 }
@@ -395,23 +400,25 @@ function ItemModal({ type, editTarget, saving, onClose, onSubmit }: { type: Moda
   const work = editTarget?.type === "work" ? editTarget.item : null;
   const staffing = editTarget?.type === "staffing" ? editTarget.item : null;
   const timeline = editTarget?.type === "timeline" ? editTarget.item : null;
-  const editing = Boolean(work || staffing || timeline);
-  const title = work ? "リリース作業を編集" : staffing ? "体制メンバーを編集" : timeline ? "作業明細を編集" : type === "work" ? "リリース作業を登録" : type === "staffing" ? "体制メンバーを追加" : type === "timeline" ? "作業明細を追加" : type === "approval" ? "申請物を追加" : "リンクを追加";
+  const approval = editTarget?.type === "approval" ? editTarget.item : null;
+  const link = editTarget?.type === "link" ? editTarget.item : null;
+  const editing = Boolean(work || staffing || timeline || approval || link);
+  const title = work ? "リリース作業を編集" : staffing ? "体制メンバーを編集" : timeline ? "作業明細を編集" : approval ? "申請物を編集" : link ? "リンク情報を編集" : type === "work" ? "リリース作業を登録" : type === "staffing" ? "体制メンバーを追加" : type === "timeline" ? "作業明細を追加" : type === "approval" ? "申請物を追加" : "リンクを追加";
   return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="section-kicker">{editing ? "EDIT ITEM" : type === "work" ? "NEW RELEASE WORK" : "NEW ITEM"}</span><h2 id="modal-title">{title}</h2></div><button onClick={onClose} aria-label="閉じる">×</button></div><form onSubmit={onSubmit}>
     {type === "work" && <><label>作業名<input name="name" defaultValue={work?.name} placeholder="例：決済基盤アップデート" required autoFocus /></label><div className="field-row"><label>バージョン<input name="version" defaultValue={work?.version} placeholder="v2.8.0" required /></label><label>環境<select name="environment" defaultValue={work?.environment || "Production"}><option>Production</option><option>Staging</option><option>Development</option></select></label></div><label>実施日時<input name="releaseDate" type="datetime-local" defaultValue={work?.releaseDate.replace(" ", "T")} required /></label><label>責任者<input name="manager" defaultValue={work?.manager} placeholder="例：田中" required /></label>{work && <label>状態<select name="status" defaultValue={work.status}><option>準備中</option><option>進行中</option><option>完了</option></select></label>}<p className="form-hint">{work ? "作業の基本情報を更新します。紐づく明細は保持されます。" : "登録後にタイムチャート・申請物・資料を追加します。"}</p></>}
     {type === "staffing" && <><div className="field-row"><label>氏名<input name="name" defaultValue={staffing?.name} placeholder="例：佐藤" required autoFocus /></label><label>電話番号<input name="phone" type="tel" defaultValue={staffing?.phone} placeholder="例：090-1234-5678" /></label></div><div className="field-row"><label>対応開始日時<input name="startAt" type="datetime-local" defaultValue={staffing?.startAt} required /></label><label>対応終了日時<input name="endAt" type="datetime-local" defaultValue={staffing?.endAt} required /></label></div><label>場所・待機形態<input name="location" defaultValue={staffing?.location} placeholder="例：名古屋、オンコール" required /></label><label>役割・補足<input name="note" defaultValue={staffing?.note} placeholder="例：現地対応、一次連絡先" /></label></>}
     {type === "timeline" && <><div className="field-row"><label>区分<select name="plan" defaultValue={timeline?.plan || "本線"}><option>本線</option><option>コンチプラン</option></select></label><label>状態<select name="status" defaultValue={timeline?.status || "未着手"}><option>未着手</option><option>進行中</option><option>完了</option></select></label></div><div className="field-row"><label>開始日時<input name="startAt" type="datetime-local" defaultValue={timeline?.startAt} required /></label><label>終了日時<input name="endAt" type="datetime-local" defaultValue={timeline?.endAt} required /></label></div><label>作業内容<input name="title" defaultValue={timeline?.title} placeholder="例：本番デプロイ" required /></label><label>担当者<input name="owner" defaultValue={timeline?.owner} placeholder="例：田中" required /></label></>}
-    {type === "approval" && <><label>申請名<input name="title" required /></label><label>担当者<input name="owner" required /></label><label>期限<input name="due" placeholder="7/22" required /></label><label>申請リンク<input name="url" type="url" placeholder="https://..." required /></label></>}
-    {type === "link" && <><label>タイトル<input name="title" required /></label><label>カテゴリ<input name="category" placeholder="手順書" required /></label><label>説明<input name="description" required /></label><label>URL<input name="url" type="url" placeholder="https://..." required /></label></>}
+    {type === "approval" && <><label>申請名<input name="title" defaultValue={approval?.title} required autoFocus /></label><div className="field-row"><label>担当者<input name="owner" defaultValue={approval?.owner} required /></label><label>状態<select name="status" defaultValue={approval?.status || "未申請"}><option>未申請</option><option>申請中</option><option>承認済み</option></select></label></div><label>期限<input name="due" defaultValue={approval?.due} placeholder="7/22" required /></label><label>申請リンク<input name="url" inputMode="url" defaultValue={approval?.url} placeholder="https://... または社内パス" required /></label></>}
+    {type === "link" && <><label>タイトル<input name="title" defaultValue={link?.title} required autoFocus /></label><label>カテゴリ<input name="category" defaultValue={link?.category} placeholder="手順書" required /></label><label>説明<input name="description" defaultValue={link?.description} required /></label><label>URL<input name="url" inputMode="url" defaultValue={link?.url} placeholder="https://... または社内パス" required /></label></>}
     <div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose}>キャンセル</button><button type="submit" className="primary-button" disabled={saving}>{saving ? "保存中" : editing ? "変更を保存" : type === "work" ? "登録して明細へ" : "追加する"}</button></div>
   </form></div></div>;
 }
 
-function PreviewModal({ preview, onClose }: { preview: PreviewItem; onClose: () => void }) {
+function PreviewModal({ preview, onClose, onEdit }: { preview: PreviewItem; onClose: () => void; onEdit: (target: EditTarget) => void }) {
   const isApproval = preview.type === "approval";
   const item = preview.item;
   return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><div className="modal preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-title" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="section-kicker">{isApproval ? "APPROVAL DETAIL" : "RESOURCE DETAIL"}</span><h2 id="preview-title">{item.title}</h2></div><button onClick={onClose} aria-label="閉じる">×</button></div><div className="preview-body">
     {isApproval ? <><div className="preview-status"><span className={`tag status-${preview.item.status}`}>{preview.item.status}</span></div><dl><div><dt>担当者</dt><dd>{preview.item.owner}</dd></div><div><dt>期限</dt><dd>{preview.item.due}</dd></div></dl></> : <><span className="preview-category">{preview.item.category}</span><p>{preview.item.description}</p></>}
-    <div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose}>閉じる</button><a className="primary-button modal-link-button" href={item.url} target="_blank" rel="noopener noreferrer">リンクを開く ↗</a></div>
+    <div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose}>閉じる</button><button type="button" className="ghost-button" onClick={() => onEdit(preview)}>情報を編集</button><a className="primary-button modal-link-button" href={item.url} target="_blank" rel="noopener noreferrer">リンクを開く ↗</a></div>
   </div></div></div>;
 }
