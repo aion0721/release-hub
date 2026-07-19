@@ -166,6 +166,10 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .time-fieldset.actual { border-color:#cfe8dd; background:#f8fcfa; }
 .time-fieldset.actual legend { color:#18785c; }
 .field-help { margin:0; color:#77899b; font-size:9px; }
+.actual-datetime-field { display:grid; gap:6px; }
+.set-now-button { justify-self:start; padding:5px 8px; border:1px solid #b9ddce; border-radius:6px; color:#147458; background:#fff; font-size:9px; font-weight:800; cursor:pointer; }
+.set-now-button:hover { border-color:#79bda4; background:#edf9f4; }
+.set-now-button:focus-visible { outline:2px solid #73bea3; outline-offset:2px; }
 .back-button { display:block; margin:0 0 7px; padding:0; border:0; background:none; color:#4774ad; font-size:11px; font-weight:700; cursor:pointer; }
 .section-empty { margin:18px; color:#94a0af; font-size:11px; text-align:center; }
 .links-empty { margin:12px 22px 0; }

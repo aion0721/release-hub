@@ -57,7 +57,7 @@ test("SPA contains editable release-operation controls", async () => {
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
     readFile(new URL("../index.html", import.meta.url), "utf8"),
   ]);
-  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "SystemIDで絞り込み", "作業カレンダー", "前の月", "次の月", "予定開始日時", "予定終了日時", "実績開始日時", "実績終了日時", "作業中は実績開始のみ入力", "実績を編集", "ガント", "当日体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "手順書・関連リンク", "リンク情報を編集", "情報を編集", "リンクを開く"]) {
+  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "SystemIDで絞り込み", "作業カレンダー", "前の月", "次の月", "予定開始日時", "予定終了日時", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "ガント", "当日体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "手順書・関連リンク", "リンク情報を編集", "情報を編集", "リンクを開く"]) {
     assert.match(app, new RegExp(label));
   }
   assert.match(app, /PreviewModal/);
@@ -68,6 +68,7 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(app, /AllInOneList/);
   assert.doesNotMatch(app, /≋ 統合/);
   assert.match(app, /Math\.round\(rawDelta \/ 5\) \* 5/);
+  assert.match(app, /getTimezoneOffset\(\) \* 60_000/);
   assert.match(html, /Release Hub \| リリース情報をひとつに/);
 });
 
