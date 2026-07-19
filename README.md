@@ -9,6 +9,14 @@
 申請物と手順書・関連リンクは、一覧から詳細モーダルを開き、内容を確認してから対象リンクへ移動できます。
 ブラウザセッションの初回表示時には、Release Hubのスプラッシュ画像を短時間表示します。
 
+## 仕様・設計資料
+
+- [ドキュメント一覧](docs/README.md)
+- [機能仕様書](docs/requirements.md)
+- [基本設計書](docs/basic-design.md)
+- [API仕様書](docs/api-spec.md)
+- [テスト仕様書](docs/test-spec.md)
+
 ## 構成
 
 - フロントエンド: React + Vite + TypeScript のSPA

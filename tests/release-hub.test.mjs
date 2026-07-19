@@ -87,6 +87,21 @@ test("GitHub Pages workflow builds the demo with required deployment settings", 
   assert.match(workflow, /needs: build/);
 });
 
+test("project documentation covers current product, API, design, and acceptance tests", async () => {
+  const [readme, requirements, design, api, testSpec] = await Promise.all([
+    readFile(new URL("../README.md", import.meta.url), "utf8"),
+    readFile(new URL("../docs/requirements.md", import.meta.url), "utf8"),
+    readFile(new URL("../docs/basic-design.md", import.meta.url), "utf8"),
+    readFile(new URL("../docs/api-spec.md", import.meta.url), "utf8"),
+    readFile(new URL("../docs/test-spec.md", import.meta.url), "utf8"),
+  ]);
+  for (const path of ["docs/requirements.md", "docs/basic-design.md", "docs/api-spec.md", "docs/test-spec.md"]) assert.match(readme, new RegExp(path));
+  for (const term of ["SystemID", "コンチプラン", "表示範囲外", "VITE_DEMO_MODE"]) assert.match(requirements, new RegExp(term));
+  for (const term of ["mermaid", "release.json", "GitLab CI", "GitHub Actions"]) assert.match(design, new RegExp(term));
+  for (const endpoint of ["GET /health", "GET /api/releases", "POST /api/releases", "PUT /api/releases/:id"]) assert.match(api, new RegExp(endpoint));
+  for (const testId of ["FT-020", "FT-046", "API-007", "MIG-006", "NFT-008"]) assert.match(testSpec, new RegExp(testId));
+});
+
 test("development command starts both the SPA and Node API", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const devScript = await readFile(new URL("../scripts/dev.mjs", import.meta.url), "utf8");
