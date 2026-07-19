@@ -1,4 +1,4 @@
-import { type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createReleaseWork, fetchReleaseSummaries, fetchReleaseWork, saveReleaseWork } from "./api";
 import { sampleWork } from "./sampleData";
 import type { ApprovalItem, CreateReleaseInput, ReleaseSummary, ReleaseWork, ResourceLink, StaffingAssignment, TimelineItem, TimelinePlan, TimelineStatus } from "./types";
@@ -403,6 +403,11 @@ function fromMinutes(minutes: number) {
   return new Date(minutes * 60_000).toISOString().slice(0, 16);
 }
 
+function currentLocalMinutes() {
+  const now = new Date();
+  return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes()) / 60_000;
+}
+
 function AllInOneList({ items, assignments, disabled, onEditTimeline, onEditStaffing, onReorder }: { items: TimelineItem[]; assignments: StaffingAssignment[]; disabled: boolean; onEditTimeline: (item: TimelineItem) => void; onEditStaffing: (item: StaffingAssignment) => void; onReorder: (sourceId: number, targetId: number | null, targetPlan: TimelinePlan) => void }) {
   return <div className="all-in-one-list">
     <section className="operation-list-section"><div className="operation-subheading"><div><span className="operation-icon work">◷</span><h3>作業</h3></div><span>{items.length}件</span></div><TimelineList items={items} disabled={disabled} onEdit={onEditTimeline} onReorder={onReorder} /></section>
@@ -418,6 +423,11 @@ function GanttChart({ items, assignments, disabled, onEdit, onEditStaffing, onTi
   const dragRef = useRef<GanttDrag | null>(null);
   const suppressClickRef = useRef(false);
   const [draftTimes, setDraftTimes] = useState<Record<string, { start: number; end: number }>>({});
+  const [currentMinute, setCurrentMinute] = useState(currentLocalMinutes);
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentMinute(currentLocalMinutes()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
   if (!items.length && !assignments.length) return <p className="section-empty">表示する作業・当日体制がありません</p>;
   const ranges = items.map((item) => {
     const start = toMinutes(item.startAt);
@@ -432,6 +442,8 @@ function GanttChart({ items, assignments, disabled, onEdit, onEditStaffing, onTi
   const rangeEnd = Math.max(rangeStart + 120, Math.ceil(Math.max(...ends) / 60) * 60 + 60);
   const duration = rangeEnd - rangeStart;
   const ticks = Array.from({ length: Math.floor(duration / 60) + 1 }, (_, index) => rangeStart + index * 60);
+  const currentTimeVisible = currentMinute >= rangeStart && currentMinute <= rangeEnd;
+  const currentTimeLeft = `${((currentMinute - rangeStart) / duration) * 100}%`;
 
   function draftKey(itemType: GanttDrag["itemType"], id: number) {
     return `${itemType}-${id}`;
@@ -486,8 +498,8 @@ function GanttChart({ items, assignments, disabled, onEdit, onEditStaffing, onTi
     }
   }
 
-  return <div className="gantt-scroll"><div className="gantt-chart" style={{ minWidth: `${Math.max(760, 260 + duration * 1.35)}px` }} role="group" aria-label={`${formatMinutes(rangeStart)}から${formatMinutes(rangeEnd)}までの作業と当日体制`}>
-    <div className="gantt-corner">作業・メンバー / 時間</div><div className="gantt-axis">{ticks.map((tick) => <span key={tick} style={{ left: `${((tick - rangeStart) / duration) * 100}%` }}>{formatMinutes(tick)}</span>)}</div>
+  return <div className="gantt-scroll"><div className={`gantt-chart ${currentTimeVisible ? "now-visible" : ""}`} style={{ minWidth: `${Math.max(760, 260 + duration * 1.35)}px`, "--gantt-now-left": currentTimeLeft } as CSSProperties} role="group" aria-label={`${formatMinutes(rangeStart)}から${formatMinutes(rangeEnd)}までの作業と当日体制`}>
+    <div className="gantt-corner">作業・メンバー / 時間</div><div className="gantt-axis">{ticks.map((tick) => <span key={tick} style={{ left: `${((tick - rangeStart) / duration) * 100}%` }}>{formatMinutes(tick)}</span>)}{currentTimeVisible ? <i className="gantt-now-marker" style={{ left: currentTimeLeft }}><b>現在 {formatMinutes(currentMinute)}</b></i> : <em className="gantt-now-outside">現在 {formatMinutes(currentMinute)}（表示範囲外）</em>}</div>
     <div className="gantt-section-label"><span className="operation-icon work">◷</span>作業</div><div className="gantt-section-line"><span>WORK</span><div className="gantt-legend"><i className="planned" />予定<i className="actual" />実績</div></div>
     {ranges.map(({ item, start: savedStart, end: savedEnd, actualStart, actualEnd }) => {
       const draft = draftTimes[draftKey("timeline", item.id)];

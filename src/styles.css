@@ -229,6 +229,9 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .gantt-axis span { position:absolute; bottom:9px; translate:-50% 0; color:#718097; font-family:Consolas,monospace; font-size:9px; }
 .gantt-axis span:first-child { translate:0 0; }
 .gantt-axis span:last-child { translate:-100% 0; }
+.gantt-now-marker { position:absolute; top:0; bottom:0; z-index:5; width:2px; border-left:2px solid #e13747; pointer-events:none; }
+.gantt-now-marker b { position:absolute; top:4px; left:0; translate:-50% 0; padding:3px 6px; border-radius:5px; color:#fff; background:#d92e40; font-size:8px; font-style:normal; white-space:nowrap; box-shadow:0 2px 6px #8f152b38; }
+.gantt-now-outside { position:absolute; top:5px; right:10px; padding:3px 6px; border-radius:5px; color:#a14d58; background:#fff0f2; font-size:8px; font-style:normal; font-weight:800; }
 .gantt-section-label { min-height:34px; display:flex; align-items:center; gap:7px; padding:0 22px; border-bottom:1px solid #e7ecf2; background:#f7f9fc; color:#53657b; font-size:9px; font-weight:800; }
 .gantt-section-line { min-height:34px; display:flex; align-items:center; gap:14px; padding-left:12px; border-bottom:1px solid #e7ecf2; background:#f7f9fc; }
 .gantt-section-line span { color:#71869f; font-size:8px; font-weight:800; letter-spacing:.08em; }
@@ -244,6 +247,7 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .staffing-gantt-label { display:flex; align-items:center; gap:8px; }
 .staffing-gantt-label>span:last-child { min-width:0; display:grid; gap:3px; }
 .gantt-lane { min-height:56px; position:relative; border-bottom:1px solid #edf1f5; background-image:linear-gradient(to right,#e8edf3 1px,transparent 1px); }
+.gantt-chart.now-visible .gantt-lane::after { content:""; position:absolute; top:0; bottom:0; left:var(--gantt-now-left); z-index:6; width:2px; background:#e13747; pointer-events:none; box-shadow:0 0 0 1px #ffffff80; }
 .work-gantt-lane,.gantt-label:has(+.work-gantt-lane) { min-height:70px; }
 .work-gantt-lane .gantt-bar { top:8px; height:29px; }
 .actual-gantt-bar { position:absolute; bottom:9px; height:10px; min-width:5px; padding:0; border:0; border-radius:5px; background:#12a875; cursor:pointer; box-shadow:0 2px 5px #08795633; }
