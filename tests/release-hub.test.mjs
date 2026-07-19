@@ -38,7 +38,7 @@ async function createRelease(baseUrl, overrides = {}) {
   const { response, body } = await requestJson(`${baseUrl}/api/releases`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-forwarded-user": "test-user" },
-    body: JSON.stringify({ name: "会員基盤リリース", version: "v1.3.0", releaseDate: "2026-08-01 22:00", environment: "Production", manager: "山田", ...overrides }),
+    body: JSON.stringify({ systemId: "MEMBER", name: "会員基盤リリース", version: "v1.3.0", releaseDate: "2026-08-01 22:00", environment: "Production", manager: "山田", ...overrides }),
   });
   assert.equal(response.status, 201);
   return body;
@@ -57,7 +57,7 @@ test("SPA contains editable release-operation controls", async () => {
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
     readFile(new URL("../index.html", import.meta.url), "utf8"),
   ]);
-  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業一覧", "リリース作業を登録", "ガント", "当日体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "手順書・関連リンク", "リンク情報を編集", "情報を編集", "リンクを開く"]) {
+  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "SystemIDで絞り込み", "作業カレンダー", "前の月", "次の月", "ガント", "当日体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "手順書・関連リンク", "リンク情報を編集", "情報を編集", "リンクを開く"]) {
     assert.match(app, new RegExp(label));
   }
   assert.match(app, /PreviewModal/);
@@ -96,6 +96,7 @@ test("development command starts both the SPA and Node API", async () => {
 test("Node API migrates legacy time-only details across midnight", async (context) => {
   const baseUrl = await startServer(context);
   const created = await createRelease(baseUrl);
+  delete created.release.systemId;
   created.timeline.push(
     { id: 1, time: "23:50", endTime: "00:10", title: "デプロイ", owner: "山田", status: "完了" },
     { id: 2, time: "00:15", endTime: "00:45", title: "翌日確認", owner: "山田", status: "未着手" },
@@ -112,6 +113,7 @@ test("Node API migrates legacy time-only details across midnight", async (contex
   assert.equal(saved.staffing[0].startAt, "2026-08-01T21:00");
   assert.equal(saved.staffing[0].endAt, "2026-08-02T01:00");
   assert.equal(saved.staffing[0].phone, "");
+  assert.equal(saved.release.systemId, "未設定");
   assert.equal("time" in saved.timeline[0], false);
   assert.equal("startTime" in saved.staffing[0], false);
 });
@@ -121,6 +123,7 @@ test("Node API persists work edits, contact details, plan types, and timeline or
   const initial = await requestJson(`${baseUrl}/api/releases`);
   assert.equal(initial.response.status, 200);
   assert.equal(initial.body[0].name, "決済基盤アップデート");
+  assert.equal(initial.body[0].systemId, "PAYMENT");
 
   const created = await createRelease(baseUrl);
   created.timeline = [
@@ -133,6 +136,7 @@ test("Node API persists work edits, contact details, plan types, and timeline or
   let saved = (await saveRelease(baseUrl, created)).body;
 
   saved.release.name = "会員基盤リリース（更新）";
+  saved.release.systemId = "MEMBER-CORE";
   saved.release.status = "進行中";
   saved.release.manager = "佐藤";
   saved.timeline.reverse();
@@ -146,6 +150,7 @@ test("Node API persists work edits, contact details, plan types, and timeline or
   const reloaded = await requestJson(`${baseUrl}/api/releases/${created.release.id}`);
   assert.equal(reloaded.response.status, 200);
   assert.equal(reloaded.body.release.name, "会員基盤リリース（更新）");
+  assert.equal(reloaded.body.release.systemId, "MEMBER-CORE");
   assert.equal(reloaded.body.release.status, "進行中");
   assert.equal(reloaded.body.release.manager, "佐藤");
   assert.deepEqual(reloaded.body.timeline.map((item) => item.id), [2, 1]);
@@ -160,6 +165,7 @@ test("Node API persists work edits, contact details, plan types, and timeline or
   assert.equal(summaries.body[0].id, created.release.id);
   assert.equal(summaries.body[0].progress, 50);
   assert.equal(summaries.body[0].status, "進行中");
+  assert.equal(summaries.body[0].systemId, "MEMBER-CORE");
 });
 
 test("Node API rejects invalid mutations and reports missing resources", async (context) => {

@@ -3,6 +3,7 @@ import type { ReleaseWork } from "./types";
 export const sampleWork: ReleaseWork = {
   release: {
     id: 1,
+    systemId: "PAYMENT",
     name: "決済基盤アップデート",
     version: "v2.8.0",
     releaseDate: "2026-07-24 22:00",

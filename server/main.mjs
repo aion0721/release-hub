@@ -34,6 +34,7 @@ async function readDatabase() {
 function normalizeDatabase(database) {
   for (const work of database.releases) {
     work.release.manager ||= work.release.updatedBy || "未設定";
+    work.release.systemId ||= "未設定";
     work.staffing ||= [];
     normalizeTimeline(work);
     normalizeStaffing(work);
@@ -131,7 +132,7 @@ function isReleaseWork(value) {
 }
 
 function isCreateInput(value) {
-  return Boolean(value && typeof value === "object" && ["name", "version", "releaseDate", "environment", "manager"].every((key) => typeof value[key] === "string" && value[key].trim()));
+  return Boolean(value && typeof value === "object" && ["systemId", "name", "version", "releaseDate", "environment", "manager"].every((key) => typeof value[key] === "string" && value[key].trim()));
 }
 
 function summary(work) {
@@ -201,7 +202,7 @@ const server = createServer(async (request, response) => {
       const created = await mutateDatabase((database) => {
         const id = database.releases.reduce((largest, work) => Math.max(largest, work.release.id), 0) + 1;
         const now = new Date().toISOString();
-        const work = { release: { id, name: input.name.trim(), version: input.version.trim(), releaseDate: input.releaseDate.trim(), environment: input.environment.trim(), status: "準備中", manager: input.manager.trim(), updatedBy: requestUser(request, input.manager.trim()), updatedAt: now }, timeline: [], staffing: [], approvals: [], links: [] };
+        const work = { release: { id, systemId: input.systemId.trim(), name: input.name.trim(), version: input.version.trim(), releaseDate: input.releaseDate.trim(), environment: input.environment.trim(), status: "準備中", manager: input.manager.trim(), updatedBy: requestUser(request, input.manager.trim()), updatedAt: now }, timeline: [], staffing: [], approvals: [], links: [] };
         database.releases.push(work);
         return work;
       });

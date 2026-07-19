@@ -42,6 +42,7 @@ export type StaffingAssignment = {
 export type ReleaseWork = {
   release: {
     id: number;
+    systemId: string;
     name: string;
     version: string;
     releaseDate: string;
@@ -65,5 +66,5 @@ export type ReleaseSummary = ReleaseWork["release"] & {
 
 export type CreateReleaseInput = Pick<
   ReleaseWork["release"],
-  "name" | "version" | "releaseDate" | "environment" | "manager"
+  "systemId" | "name" | "version" | "releaseDate" | "environment" | "manager"
 >;

@@ -16,10 +16,19 @@ function toSummary(work: ReleaseWork): ReleaseSummary {
   const done = work.timeline.filter((item) => item.status === "完了").length;
   return {
     ...work.release,
+    systemId: work.release.systemId || "未設定",
     progress: work.timeline.length ? Math.round((done / work.timeline.length) * 100) : 0,
     timelineCount: work.timeline.length,
     approvalCount: work.approvals.length,
   };
+}
+
+function normalizeSummary(item: ReleaseSummary): ReleaseSummary {
+  return { ...item, systemId: item.systemId || "未設定" };
+}
+
+function normalizeWork(work: ReleaseWork): ReleaseWork {
+  return { ...work, release: { ...work.release, systemId: work.release.systemId || "未設定" } };
 }
 
 export default function App() {
@@ -40,7 +49,7 @@ export default function App() {
       return;
     }
     try {
-      setSummaries(await fetchReleaseSummaries());
+      setSummaries((await fetchReleaseSummaries()).map(normalizeSummary));
       setError("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "作業一覧を読み込めませんでした");
@@ -73,7 +82,7 @@ export default function App() {
       return;
     }
     try {
-      setSelected(await fetchReleaseWork(id));
+      setSelected(normalizeWork(await fetchReleaseWork(id)));
       setError("");
       window.scrollTo({ top: 0 });
     } catch (reason) {
@@ -171,6 +180,7 @@ export default function App() {
           ...selected,
           release: {
             ...selected.release,
+            systemId: String(values.systemId),
             name: String(values.name),
             version: String(values.version),
             releaseDate: String(values.releaseDate).replace("T", " "),
@@ -184,6 +194,7 @@ export default function App() {
         return;
       }
       const input: CreateReleaseInput = {
+        systemId: String(values.systemId),
         name: String(values.name),
         version: String(values.version),
         releaseDate: String(values.releaseDate).replace("T", " "),
@@ -272,27 +283,53 @@ function Sidebar({ detailOpen, onShowList }: { detailOpen: boolean; onShowList: 
   </aside>;
 }
 
+function shiftMonth(month: string, delta: number) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, monthNumber - 1 + delta, 1)).toISOString().slice(0, 7);
+}
+
+function buildCalendarDays(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const first = new Date(Date.UTC(year, monthNumber - 1, 1));
+  const gridStart = new Date(first);
+  gridStart.setUTCDate(1 - first.getUTCDay());
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(gridStart);
+    date.setUTCDate(gridStart.getUTCDate() + index);
+    const value = date.toISOString().slice(0, 10);
+    return { value, day: date.getUTCDate(), inMonth: value.slice(0, 7) === month };
+  });
+}
+
+function formatMonth(month: string) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return `${year}年 ${monthNumber}月`;
+}
+
 function WorkList({ summaries, loading, onCreate, onOpen }: { summaries: ReleaseSummary[]; loading: boolean; onCreate: () => void; onOpen: (id: number) => void }) {
-  const activeCount = summaries.filter((item) => item.status !== "完了").length;
+  const [view, setView] = useState<"list" | "calendar">("list");
+  const [systemFilter, setSystemFilter] = useState("all");
+  const [calendarMonth, setCalendarMonth] = useState(() => summaries[0]?.releaseDate.slice(0, 7) || new Date().toISOString().slice(0, 7));
+  const systemIds = useMemo(() => [...new Set(summaries.map((item) => item.systemId))].sort((a, b) => a.localeCompare(b, "ja")), [summaries]);
+  const filtered = useMemo(() => systemFilter === "all" ? summaries : summaries.filter((item) => item.systemId === systemFilter), [summaries, systemFilter]);
+  const activeCount = filtered.filter((item) => item.status !== "完了").length;
+  const calendarDays = useMemo(() => buildCalendarDays(calendarMonth), [calendarMonth]);
   return <>
-    <header className="topbar list-topbar"><div><span className="eyebrow">RELEASE WORKS</span><h1>リリース作業一覧</h1><p>作業を登録してから、タイムチャート・申請・資料を紐づけます。</p></div><button className="primary-button" onClick={onCreate}>＋ 新しい作業を登録</button></header>
+    <header className="topbar list-topbar"><div><span className="eyebrow">RELEASE WORKS</span><h1>リリース作業</h1><p>SystemIDごと、または全体の作業予定を一覧・カレンダーで確認できます。</p></div><button className="primary-button" onClick={onCreate}>＋ 新しい作業を登録</button></header>
     <section className="list-hero">
-      <div><span className="section-kicker">OVERVIEW</span><strong>{summaries.length}</strong><p>登録済みのリリース作業</p></div>
+      <div><span className="section-kicker">OVERVIEW</span><strong>{filtered.length}</strong><p>{systemFilter === "all" ? "全SystemIDのリリース作業" : `${systemFilter} のリリース作業`}</p></div>
       <div><span>進行中・準備中</span><strong>{activeCount}</strong></div>
       <div><span>今後の流れ</span><ol><li><i>1</i>作業を登録</li><li><i>2</i>明細を追加</li><li><i>3</i>当日の進捗を更新</li></ol></div>
     </section>
     <section className="panel work-list-panel">
-      <div className="panel-heading"><div><span className="section-kicker">RELEASE QUEUE</span><h2>作業を選択</h2></div><span className="list-count">{summaries.length}件</span></div>
-      <div className="work-table-head"><span>作業名</span><span>実施日時</span><span>責任者</span><span>進捗</span><span>状態</span><span /></div>
-      <div className="work-list">
-        {summaries.map((work) => <button className="work-row" key={work.id} onClick={() => onOpen(work.id)} disabled={loading}>
-          <span className="work-title"><i>{work.name.slice(0, 1)}</i><span><strong>{work.name}</strong><small>{work.version}・{work.environment}</small></span></span>
-          <span className="work-date">{work.releaseDate}</span><span>{work.manager}</span>
-          <span className="row-progress"><span><i style={{ width: `${work.progress}%` }} /></span><b>{work.progress}%</b><small>{work.timelineCount}工程</small></span>
-          <span><em className={`release-status release-status-${work.status}`}>{work.status}</em></span><span className="row-arrow">›</span>
+      <div className="panel-heading work-list-heading"><div><span className="section-kicker">{view === "list" ? "RELEASE QUEUE" : "RELEASE CALENDAR"}</span><h2>{view === "list" ? "作業を選択" : "作業カレンダー"}</h2></div><div className="work-view-controls"><label>SystemID<select value={systemFilter} onChange={(event) => setSystemFilter(event.target.value)} aria-label="SystemIDで絞り込み"><option value="all" key="all">すべて</option>{systemIds.map((systemId) => <option value={systemId} key={systemId}>{systemId}</option>)}</select></label><div className="view-switch" aria-label="作業表示"><button className={view === "list" ? "active" : ""} onClick={() => setView("list")} aria-pressed={view === "list"}>☷ リスト</button><button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")} aria-pressed={view === "calendar"}>▦ カレンダー</button></div><span className="list-count">{filtered.length}件</span></div></div>
+      {view === "list" ? <><div className="work-table-head"><span>作業名</span><span>SystemID</span><span>作業日時</span><span>責任者</span><span>進捗</span><span>状態</span><span /></div><div className="work-list">
+        {filtered.map((work) => <button className="work-row" key={work.id} onClick={() => onOpen(work.id)} disabled={loading}>
+          <span className="work-title"><i>{work.name.slice(0, 1)}</i><span><strong>{work.name}</strong><small>{work.version}・{work.environment}</small></span></span><span className="system-id-badge">{work.systemId}</span>
+          <span className="work-date">{work.releaseDate}</span><span>{work.manager}</span><span className="row-progress"><span><i style={{ width: `${work.progress}%` }} /></span><b>{work.progress}%</b><small>{work.timelineCount}工程</small></span><span><em className={`release-status release-status-${work.status}`}>{work.status}</em></span><span className="row-arrow">›</span>
         </button>)}
-        {!summaries.length && <div className="empty-state"><span>＋</span><h3>最初の作業を登録しましょう</h3><p>登録後にタイムチャートや申請物を追加できます。</p><button className="primary-button" onClick={onCreate}>作業を登録</button></div>}
-      </div>
+        {!filtered.length && <div className="empty-state"><span>＋</span><h3>{summaries.length ? "該当する作業はありません" : "最初の作業を登録しましょう"}</h3><p>{summaries.length ? "SystemIDの絞り込みを変更してください。" : "登録後にタイムチャートや申請物を追加できます。"}</p>{!summaries.length && <button className="primary-button" onClick={onCreate}>作業を登録</button>}</div>}
+      </div></> : <div className="release-calendar"><div className="calendar-toolbar"><button type="button" onClick={() => setCalendarMonth((month) => shiftMonth(month, -1))} aria-label="前の月">‹</button><strong>{formatMonth(calendarMonth)}</strong><button type="button" onClick={() => setCalendarMonth((month) => shiftMonth(month, 1))} aria-label="次の月">›</button></div><div className="calendar-weekdays">{["日", "月", "火", "水", "木", "金", "土"].map((day) => <span key={day}>{day}</span>)}</div><div className="calendar-grid">{calendarDays.map((day) => { const works = filtered.filter((work) => work.releaseDate.slice(0, 10) === day.value); return <div className={`calendar-day ${day.inMonth ? "" : "outside"}`} key={day.value}><span className="calendar-day-number">{day.day}</span><div className="calendar-events">{works.map((work) => <button type="button" key={work.id} onClick={() => onOpen(work.id)} disabled={loading} aria-label={`${work.name}の詳細を開く`}><span>{work.releaseDate.slice(11, 16)}</span><strong>{work.name}</strong><small>{work.systemId}</small></button>)}</div></div>; })}</div></div>}
     </section>
   </>;
 }
@@ -304,7 +341,7 @@ function WorkDetail({ work, loading, saving, onBack, onOpenModal, onOpenEditor, 
   const approved = work.approvals.filter((item) => item.status === "承認済み").length;
   return <>
     <header className="topbar"><div><button className="back-button" onClick={onBack}>‹ 作業一覧</button><span className="eyebrow">RELEASE CONTROL CENTER</span><h1>{work.release.name}</h1></div><div className="top-actions"><span className={`live-dot ${saving ? "saving" : ""}`} /><span>{saving ? "保存中" : "共有済み"}</span><button className="ghost-button" onClick={() => onOpenEditor({ type: "work", item: work.release })}>作業情報を編集</button><button className="primary-button" onClick={() => onOpenModal("timeline")}>＋ 作業明細を追加</button></div></header>
-    <div id="overview" className="release-banner"><div className="release-main"><span className="status-pill">{work.release.status}</span><h2>{work.release.version}</h2><p>{work.release.environment} 環境</p></div><div className="release-meta"><div><span>実施日時</span><strong>{work.release.releaseDate}</strong></div><div><span>責任者</span><strong>{work.release.manager}</strong></div><div><span>作業進捗</span><strong>{progress}%</strong></div><div className="progress-track"><i style={{ width: `${progress}%` }} /></div></div></div>
+    <div id="overview" className="release-banner"><div className="release-main"><span className="status-pill">{work.release.status}</span><h2>{work.release.version}</h2><p><span className="system-id-badge">{work.release.systemId}</span>{work.release.environment} 環境</p></div><div className="release-meta"><div><span>実施日時</span><strong>{work.release.releaseDate}</strong></div><div><span>責任者</span><strong>{work.release.manager}</strong></div><div><span>作業進捗</span><strong>{progress}%</strong></div><div className="progress-track"><i style={{ width: `${progress}%` }} /></div></div></div>
     <div className="summary-grid"><article className="metric-card"><span className="metric-icon blue">◷</span><div><small>作業項目</small><strong>{work.timeline.length}</strong><em>件</em></div><p>{completed}件 完了</p></article><article className="metric-card"><span className="metric-icon purple">♙</span><div><small>当日体制</small><strong>{work.staffing.length}</strong><em>名</em></div><p>対応メンバー</p></article><article className="metric-card"><span className="metric-icon green">✓</span><div><small>申請・承認</small><strong>{approved}</strong><em>/{work.approvals.length}</em></div><p>承認済み</p></article><article className="metric-card"><span className="metric-icon amber">↗</span><div><small>関連資料</small><strong>{work.links.length}</strong><em>件</em></div><p>すぐにアクセス</p></article></div>
     <div className="workspace-grid"><section id="timeline" className={`panel timeline-panel ${timelineView === "gantt" ? "gantt-panel" : ""}`}><div className="panel-heading"><div><span className="section-kicker">ALL-IN-ONE</span><h2>当日オペレーション</h2><p className="timeline-drag-hint">{timelineView === "list" ? "作業と当日体制を一覧で編集。作業行は上下にドラッグ可能" : "作業と当日体制を同じ時間軸で表示。各バーは5分単位でドラッグ変更"}</p></div><div className="panel-actions"><div className="view-switch" aria-label="オールインワン表示"><button className={timelineView === "list" ? "active" : ""} onClick={() => setTimelineView("list")} aria-pressed={timelineView === "list"}>☷ リスト</button><button className={timelineView === "gantt" ? "active" : ""} onClick={() => setTimelineView("gantt")} aria-pressed={timelineView === "gantt"}>▥ ガント</button></div><button className="ghost-button" onClick={() => onOpenModal("staffing")}>＋ 体制</button><button className="primary-button compact-button" onClick={() => onOpenModal("timeline")}>＋ 作業</button></div></div>{timelineView === "list" ? <AllInOneList items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEditTimeline={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} onReorder={onReorderTimeline} /> : <GanttChart items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEdit={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} onTimeChange={onUpdateTimelineTime} onStaffingTimeChange={onUpdateStaffingTime} />}</section>
       <section id="approvals" className="panel approvals-panel"><div className="panel-heading"><div><span className="section-kicker">APPROVALS</span><h2>申請物一覧</h2></div><button className="ghost-button" onClick={() => onOpenModal("approval")}>＋ 追加</button></div><div className="approval-list">{work.approvals.map((item) => <button type="button" key={item.id} className="approval-row" onClick={() => onOpenPreview({ type: "approval", item })} aria-label={`${item.title}の詳細を開く`}><span className={`check ${item.status === "承認済み" ? "checked" : ""}`}>{item.status === "承認済み" ? "✓" : ""}</span><span><strong>{item.title}</strong><small>{item.owner}・期限 {item.due}</small></span><span className={`tag status-${item.status}`}>{item.status}</span><span className="external-link">詳細を見る ›</span></button>)}{!work.approvals.length && <p className="section-empty">まだ申請物はありません</p>}</div></section></div>
@@ -469,7 +506,7 @@ function ItemModal({ type, editTarget, saving, onClose, onSubmit }: { type: Moda
   const editing = Boolean(work || staffing || timeline || approval || link);
   const title = work ? "リリース作業を編集" : staffing ? "体制メンバーを編集" : timeline ? "作業明細を編集" : approval ? "申請物を編集" : link ? "リンク情報を編集" : type === "work" ? "リリース作業を登録" : type === "staffing" ? "体制メンバーを追加" : type === "timeline" ? "作業明細を追加" : type === "approval" ? "申請物を追加" : "リンクを追加";
   return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="section-kicker">{editing ? "EDIT ITEM" : type === "work" ? "NEW RELEASE WORK" : "NEW ITEM"}</span><h2 id="modal-title">{title}</h2></div><button onClick={onClose} aria-label="閉じる">×</button></div><form onSubmit={onSubmit}>
-    {type === "work" && <><label>作業名<input name="name" defaultValue={work?.name} placeholder="例：決済基盤アップデート" required autoFocus /></label><div className="field-row"><label>バージョン<input name="version" defaultValue={work?.version} placeholder="v2.8.0" required /></label><label>環境<select name="environment" defaultValue={work?.environment || "Production"}><option>Production</option><option>Staging</option><option>Development</option></select></label></div><label>実施日時<input name="releaseDate" type="datetime-local" defaultValue={work?.releaseDate.replace(" ", "T")} required /></label><label>責任者<input name="manager" defaultValue={work?.manager} placeholder="例：田中" required /></label>{work && <label>状態<select name="status" defaultValue={work.status}><option>準備中</option><option>進行中</option><option>完了</option></select></label>}<p className="form-hint">{work ? "作業の基本情報を更新します。紐づく明細は保持されます。" : "登録後にタイムチャート・申請物・資料を追加します。"}</p></>}
+    {type === "work" && <><div className="field-row"><label>SystemID<input name="systemId" defaultValue={work?.systemId} placeholder="例：PAYMENT" required autoFocus /></label><label>作業名<input name="name" defaultValue={work?.name} placeholder="例：決済基盤アップデート" required /></label></div><div className="field-row"><label>バージョン<input name="version" defaultValue={work?.version} placeholder="v2.8.0" required /></label><label>環境<select name="environment" defaultValue={work?.environment || "Production"}><option>Production</option><option>Staging</option><option>Development</option></select></label></div><label>作業日時<input name="releaseDate" type="datetime-local" defaultValue={work?.releaseDate.replace(" ", "T")} required /></label><label>責任者<input name="manager" defaultValue={work?.manager} placeholder="例：田中" required /></label>{work && <label>状態<select name="status" defaultValue={work.status}><option>準備中</option><option>進行中</option><option>完了</option></select></label>}<p className="form-hint">{work ? "作業の基本情報を更新します。紐づく明細は保持されます。" : "登録後にタイムチャート・申請物・資料を追加します。"}</p></>}
     {type === "staffing" && <><div className="field-row"><label>氏名<input name="name" defaultValue={staffing?.name} placeholder="例：佐藤" required autoFocus /></label><label>電話番号<input name="phone" type="tel" defaultValue={staffing?.phone} placeholder="例：090-1234-5678" /></label></div><div className="field-row"><label>対応開始日時<input name="startAt" type="datetime-local" defaultValue={staffing?.startAt} required /></label><label>対応終了日時<input name="endAt" type="datetime-local" defaultValue={staffing?.endAt} required /></label></div><label>場所・待機形態<input name="location" defaultValue={staffing?.location} placeholder="例：名古屋、オンコール" required /></label><label>役割・補足<input name="note" defaultValue={staffing?.note} placeholder="例：現地対応、一次連絡先" /></label></>}
     {type === "timeline" && <><div className="field-row"><label>区分<select name="plan" defaultValue={timeline?.plan || "本線"}><option>本線</option><option>コンチプラン</option></select></label><label>状態<select name="status" defaultValue={timeline?.status || "未着手"}><option>未着手</option><option>進行中</option><option>完了</option></select></label></div><div className="field-row"><label>開始日時<input name="startAt" type="datetime-local" defaultValue={timeline?.startAt} required /></label><label>終了日時<input name="endAt" type="datetime-local" defaultValue={timeline?.endAt} required /></label></div><label>作業内容<input name="title" defaultValue={timeline?.title} placeholder="例：本番デプロイ" required /></label><label>担当者<input name="owner" defaultValue={timeline?.owner} placeholder="例：田中" required /></label></>}
     {type === "approval" && <><label>申請名<input name="title" defaultValue={approval?.title} required autoFocus /></label><div className="field-row"><label>担当者<input name="owner" defaultValue={approval?.owner} required /></label><label>状態<select name="status" defaultValue={approval?.status || "未申請"}><option>未申請</option><option>申請中</option><option>承認済み</option></select></label></div><label>期限<input name="due" defaultValue={approval?.due} placeholder="7/22" required /></label><label>申請リンク<input name="url" inputMode="url" defaultValue={approval?.url} placeholder="https://... または社内パス" required /></label></>}
