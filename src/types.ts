@@ -6,6 +6,8 @@ export type TimelineItem = {
   id: number;
   startAt: string;
   endAt: string;
+  actualStartAt?: string;
+  actualEndAt?: string;
   title: string;
   owner: string;
   status: TimelineStatus;

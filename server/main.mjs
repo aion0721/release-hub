@@ -88,6 +88,8 @@ function normalizeTimeline(work) {
     } else {
       item.endAt = String(item.endAt).replace(" ", "T");
     }
+    item.actualStartAt = item.actualStartAt ? String(item.actualStartAt).replace(" ", "T") : "";
+    item.actualEndAt = item.actualEndAt ? String(item.actualEndAt).replace(" ", "T") : "";
     delete item.time;
     delete item.endTime;
   }

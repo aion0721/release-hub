@@ -110,6 +110,10 @@ button.nav-item { width:100%; border:0; background:transparent; text-align:left;
 .task { display:grid; gap:4px; padding-left:7px; }
 .task strong,.approval-row strong { font-size:12px; }
 .task small,.approval-row small { color:#8793a3; font-size:10px; }
+.time-kind { display:inline-flex; margin-right:6px; padding:2px 5px; border-radius:4px; font-size:8px; }
+.time-kind.planned { color:#526a85; background:#edf1f5; }
+.time-kind.actual { color:#087956; background:#e5f7ef; }
+.actual-time.recorded,.actual-recorded { color:#27745e!important; }
 .tag { display:inline-flex; justify-content:center; min-width:55px; padding:4px 7px; border-radius:20px; font-size:9px; font-weight:800; white-space:nowrap; }
 .status-未着手,.status-未申請 { background:#f1f4f7; color:#718096; }
 .status-進行中,.status-申請中 { background:#fff3d8; color:#b76700; }
@@ -157,6 +161,11 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .modal-link-button { display:inline-flex; align-items:center; text-decoration:none; }
 .field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .form-hint { margin:0; padding:10px 12px; border-radius:7px; background:#f3f7fc; color:#63738a; font-size:10px; line-height:1.5; }
+.time-fieldset { display:grid; gap:8px; margin:0; padding:12px; border:1px solid #dce3eb; border-radius:8px; }
+.time-fieldset legend { padding:0 6px; color:#52667f; font-size:10px; font-weight:900; }
+.time-fieldset.actual { border-color:#cfe8dd; background:#f8fcfa; }
+.time-fieldset.actual legend { color:#18785c; }
+.field-help { margin:0; color:#77899b; font-size:9px; }
 .back-button { display:block; margin:0 0 7px; padding:0; border:0; background:none; color:#4774ad; font-size:11px; font-weight:700; cursor:pointer; }
 .section-empty { margin:18px; color:#94a0af; font-size:11px; text-align:center; }
 .links-empty { margin:12px 22px 0; }
@@ -217,9 +226,13 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .gantt-axis span:first-child { translate:0 0; }
 .gantt-axis span:last-child { translate:-100% 0; }
 .gantt-section-label { min-height:34px; display:flex; align-items:center; gap:7px; padding:0 22px; border-bottom:1px solid #e7ecf2; background:#f7f9fc; color:#53657b; font-size:9px; font-weight:800; }
-.gantt-section-line { min-height:34px; display:flex; align-items:center; padding-left:12px; border-bottom:1px solid #e7ecf2; background:#f7f9fc; }
+.gantt-section-line { min-height:34px; display:flex; align-items:center; gap:14px; padding-left:12px; border-bottom:1px solid #e7ecf2; background:#f7f9fc; }
 .gantt-section-line span { color:#71869f; font-size:8px; font-weight:800; letter-spacing:.08em; }
 .gantt-section-line.staffing span { color:#7553ae; }
+.gantt-legend { display:flex; align-items:center; gap:5px; color:#71869f; font-size:8px; font-weight:800; }
+.gantt-legend i { width:16px; height:5px; border-radius:4px; }
+.gantt-legend i.planned { background:#75869a; }
+.gantt-legend i.actual { background:#12a875; }
 .gantt-row { display:contents; }
 .gantt-label { min-height:56px; display:grid; align-content:center; gap:3px; padding:8px 14px 8px 22px; border-bottom:1px solid #edf1f5; }
 .gantt-label strong { overflow:hidden; color:#26384f; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
@@ -227,6 +240,11 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .staffing-gantt-label { display:flex; align-items:center; gap:8px; }
 .staffing-gantt-label>span:last-child { min-width:0; display:grid; gap:3px; }
 .gantt-lane { min-height:56px; position:relative; border-bottom:1px solid #edf1f5; background-image:linear-gradient(to right,#e8edf3 1px,transparent 1px); }
+.work-gantt-lane,.gantt-label:has(+.work-gantt-lane) { min-height:70px; }
+.work-gantt-lane .gantt-bar { top:8px; height:29px; }
+.actual-gantt-bar { position:absolute; bottom:9px; height:10px; min-width:5px; padding:0; border:0; border-radius:5px; background:#12a875; cursor:pointer; box-shadow:0 2px 5px #08795633; }
+.actual-gantt-bar.running { background:repeating-linear-gradient(135deg,#0c8f65 0,#0c8f65 6px,#28b98a 6px,#28b98a 12px); }
+.actual-gantt-bar:disabled { cursor:wait; opacity:.65; }
 .gantt-bar { position:absolute; top:13px; height:30px; overflow:hidden; border-radius:6px; color:#fff; touch-action:none; user-select:none; box-shadow:0 3px 8px #173d6a22; }
 .gantt-bar.dragging { z-index:3; filter:brightness(1.05); }
 .gantt-bar-content { width:100%; height:100%; padding:0 11px; border:0; color:inherit; background:transparent; text-align:left; cursor:grab; touch-action:none; }

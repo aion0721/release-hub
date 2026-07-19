@@ -57,7 +57,7 @@ test("SPA contains editable release-operation controls", async () => {
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
     readFile(new URL("../index.html", import.meta.url), "utf8"),
   ]);
-  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "SystemIDで絞り込み", "作業カレンダー", "前の月", "次の月", "ガント", "当日体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "手順書・関連リンク", "リンク情報を編集", "情報を編集", "リンクを開く"]) {
+  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "SystemIDで絞り込み", "作業カレンダー", "前の月", "次の月", "予定開始日時", "予定終了日時", "実績開始日時", "実績終了日時", "作業中は実績開始のみ入力", "実績を編集", "ガント", "当日体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "手順書・関連リンク", "リンク情報を編集", "情報を編集", "リンクを開く"]) {
     assert.match(app, new RegExp(label));
   }
   assert.match(app, /PreviewModal/);
@@ -114,6 +114,8 @@ test("Node API migrates legacy time-only details across midnight", async (contex
   assert.equal(saved.staffing[0].endAt, "2026-08-02T01:00");
   assert.equal(saved.staffing[0].phone, "");
   assert.equal(saved.release.systemId, "未設定");
+  assert.equal(saved.timeline[0].actualStartAt, "");
+  assert.equal(saved.timeline[0].actualEndAt, "");
   assert.equal("time" in saved.timeline[0], false);
   assert.equal("startTime" in saved.staffing[0], false);
 });
@@ -127,7 +129,7 @@ test("Node API persists work edits, contact details, plan types, and timeline or
 
   const created = await createRelease(baseUrl);
   created.timeline = [
-    { id: 1, startAt: "2026-08-01T22:00", endAt: "2026-08-01T22:30", title: "本番デプロイ", owner: "山田", status: "完了", plan: "本線" },
+    { id: 1, startAt: "2026-08-01T22:00", endAt: "2026-08-01T22:30", actualStartAt: "2026-08-01T22:05", actualEndAt: "2026-08-01T22:42", title: "本番デプロイ", owner: "山田", status: "完了", plan: "本線" },
     { id: 2, startAt: "2026-08-01T22:30", endAt: "2026-08-01T23:00", title: "切り戻し", owner: "佐藤", status: "未着手", plan: "コンチプラン" },
   ];
   created.staffing = [{ id: 1, name: "佐藤", phone: "090-1111-2222", startAt: "2026-08-01T21:00", endAt: "2026-08-02T01:00", location: "オンコール", note: "一次連絡先" }];
@@ -155,6 +157,8 @@ test("Node API persists work edits, contact details, plan types, and timeline or
   assert.equal(reloaded.body.release.manager, "佐藤");
   assert.deepEqual(reloaded.body.timeline.map((item) => item.id), [2, 1]);
   assert.equal(reloaded.body.timeline[0].plan, "コンチプラン");
+  assert.equal(reloaded.body.timeline[1].actualStartAt, "2026-08-01T22:05");
+  assert.equal(reloaded.body.timeline[1].actualEndAt, "2026-08-01T22:42");
   assert.equal(reloaded.body.staffing[0].phone, "090-3333-4444");
   assert.equal(reloaded.body.approvals[0].title, "本番変更申請（更新）");
   assert.equal(reloaded.body.approvals[0].status, "承認済み");
