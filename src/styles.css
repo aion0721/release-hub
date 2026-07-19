@@ -165,6 +165,11 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .time-fieldset legend { padding:0 6px; color:#52667f; font-size:10px; font-weight:900; }
 .time-fieldset.actual { border-color:#cfe8dd; background:#f8fcfa; }
 .time-fieldset.actual legend { color:#18785c; }
+.duration-presets { display:flex; align-items:center; gap:6px; }
+.duration-presets span { margin-right:2px; color:#7a8797; font-size:9px; font-weight:800; }
+.duration-presets button { padding:5px 8px; border:1px solid #c9d6e5; border-radius:6px; color:#3f648f; background:#fff; font-size:9px; font-weight:800; cursor:pointer; }
+.duration-presets button:hover { border-color:#82a8d4; background:#f1f7ff; }
+.duration-presets button:focus-visible { outline:2px solid #82a8d4; outline-offset:2px; }
 .field-help { margin:0; color:#77899b; font-size:9px; }
 .actual-datetime-field { display:grid; gap:6px; }
 .set-now-button { justify-self:start; padding:5px 8px; border:1px solid #b9ddce; border-radius:6px; color:#147458; background:#fff; font-size:9px; font-weight:800; cursor:pointer; }

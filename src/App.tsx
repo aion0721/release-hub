@@ -227,6 +227,10 @@ export default function App() {
     }
 
     if (!selected) return;
+    if (modal === "timeline") {
+      values.startAt = `${String(values.workDate)}T${String(values.startTime)}`;
+      values.endAt = `${String(values.endDate)}T${String(values.endTime)}`;
+    }
     if ((modal === "staffing" || modal === "timeline") && String(values.endAt) <= String(values.startAt)) {
       setError("終了日時は開始日時より後にしてください");
       return;
@@ -273,7 +277,7 @@ export default function App() {
           <WorkList summaries={summaries} loading={loading} onCreate={() => openModal("work")} onOpen={openWork} />
         )}
       </section>
-      {modal && <ItemModal type={modal} editTarget={editTarget} saving={saving} onClose={closeModal} onSubmit={submitItem} />}
+      {modal && <ItemModal type={modal} editTarget={editTarget} releaseDate={selected?.release.releaseDate} saving={saving} onClose={closeModal} onSubmit={submitItem} />}
       {preview && <PreviewModal preview={preview} onClose={() => setPreview(null)} onEdit={(target) => openEditor(target)} />}
     </main>
   );
@@ -528,18 +532,34 @@ function setCurrentDateTime(button: HTMLButtonElement, fieldName: string) {
   input.focus();
 }
 
-function ItemModal({ type, editTarget, saving, onClose, onSubmit }: { type: ModalType; editTarget: EditTarget | null; saving: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+function setPlannedDuration(button: HTMLButtonElement, minutes: number) {
+  const form = button.form;
+  const dateInput = form?.elements.namedItem("workDate");
+  const timeInput = form?.elements.namedItem("startTime");
+  const endDateInput = form?.elements.namedItem("endDate");
+  const endTimeInput = form?.elements.namedItem("endTime");
+  if (!(dateInput instanceof HTMLInputElement) || !(timeInput instanceof HTMLInputElement) || !(endDateInput instanceof HTMLInputElement) || !(endTimeInput instanceof HTMLInputElement) || !dateInput.value || !timeInput.value) return;
+  const endAt = fromMinutes(toMinutes(`${dateInput.value}T${timeInput.value}`) + minutes);
+  endDateInput.value = endAt.slice(0, 10);
+  endTimeInput.value = endAt.slice(11, 16);
+  endTimeInput.focus();
+}
+
+function ItemModal({ type, editTarget, releaseDate, saving, onClose, onSubmit }: { type: ModalType; editTarget: EditTarget | null; releaseDate?: string; saving: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   const work = editTarget?.type === "work" ? editTarget.item : null;
   const staffing = editTarget?.type === "staffing" ? editTarget.item : null;
   const timeline = editTarget?.type === "timeline" ? editTarget.item : null;
   const approval = editTarget?.type === "approval" ? editTarget.item : null;
   const link = editTarget?.type === "link" ? editTarget.item : null;
+  const releaseStartAt = releaseDate?.replace(" ", "T") || "";
+  const plannedStartAt = timeline?.startAt || releaseStartAt;
+  const plannedEndAt = timeline?.endAt || (plannedStartAt ? fromMinutes(toMinutes(plannedStartAt) + 30) : "");
   const editing = Boolean(work || staffing || timeline || approval || link);
   const title = work ? "リリース作業を編集" : staffing ? "体制メンバーを編集" : timeline ? "作業明細を編集" : approval ? "申請物を編集" : link ? "リンク情報を編集" : type === "work" ? "リリース作業を登録" : type === "staffing" ? "体制メンバーを追加" : type === "timeline" ? "作業明細を追加" : type === "approval" ? "申請物を追加" : "リンクを追加";
   return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="section-kicker">{editing ? "EDIT ITEM" : type === "work" ? "NEW RELEASE WORK" : "NEW ITEM"}</span><h2 id="modal-title">{title}</h2></div><button onClick={onClose} aria-label="閉じる">×</button></div><form onSubmit={onSubmit}>
     {type === "work" && <><div className="field-row"><label>SystemID<input name="systemId" defaultValue={work?.systemId} placeholder="例：PAYMENT" required autoFocus /></label><label>作業名<input name="name" defaultValue={work?.name} placeholder="例：決済基盤アップデート" required /></label></div><div className="field-row"><label>バージョン<input name="version" defaultValue={work?.version} placeholder="v2.8.0" required /></label><label>環境<select name="environment" defaultValue={work?.environment || "Production"}><option>Production</option><option>Staging</option><option>Development</option></select></label></div><label>作業日時<input name="releaseDate" type="datetime-local" defaultValue={work?.releaseDate.replace(" ", "T")} required /></label><label>責任者<input name="manager" defaultValue={work?.manager} placeholder="例：田中" required /></label>{work && <label>状態<select name="status" defaultValue={work.status}><option>準備中</option><option>進行中</option><option>完了</option></select></label>}<p className="form-hint">{work ? "作業の基本情報を更新します。紐づく明細は保持されます。" : "登録後にタイムチャート・申請物・資料を追加します。"}</p></>}
     {type === "staffing" && <><div className="field-row"><label>氏名<input name="name" defaultValue={staffing?.name} placeholder="例：佐藤" required autoFocus /></label><label>電話番号<input name="phone" type="tel" defaultValue={staffing?.phone} placeholder="例：090-1234-5678" /></label></div><div className="field-row"><label>対応開始日時<input name="startAt" type="datetime-local" defaultValue={staffing?.startAt} required /></label><label>対応終了日時<input name="endAt" type="datetime-local" defaultValue={staffing?.endAt} required /></label></div><label>場所・待機形態<input name="location" defaultValue={staffing?.location} placeholder="例：名古屋、オンコール" required /></label><label>役割・補足<input name="note" defaultValue={staffing?.note} placeholder="例：現地対応、一次連絡先" /></label></>}
-    {type === "timeline" && <><div className="field-row"><label>区分<select name="plan" defaultValue={timeline?.plan || "本線"}><option>本線</option><option>コンチプラン</option></select></label><label>状態<select name="status" defaultValue={timeline?.status || "未着手"}><option>未着手</option><option>進行中</option><option>完了</option></select></label></div><fieldset className="time-fieldset"><legend>予定</legend><div className="field-row"><label>予定開始日時<input name="startAt" type="datetime-local" defaultValue={timeline?.startAt} required /></label><label>予定終了日時<input name="endAt" type="datetime-local" defaultValue={timeline?.endAt} required /></label></div></fieldset><fieldset className="time-fieldset actual"><legend>実績（任意）</legend><div className="field-row"><div className="actual-datetime-field"><label>実績開始日時<input name="actualStartAt" type="datetime-local" defaultValue={timeline?.actualStartAt} /></label><button type="button" className="set-now-button" onClick={(event) => setCurrentDateTime(event.currentTarget, "actualStartAt")}>◷ 今を開始に設定</button></div><div className="actual-datetime-field"><label>実績終了日時<input name="actualEndAt" type="datetime-local" defaultValue={timeline?.actualEndAt} /></label><button type="button" className="set-now-button" onClick={(event) => setCurrentDateTime(event.currentTarget, "actualEndAt")}>◷ 今を終了に設定</button></div></div><p className="field-help">作業中は実績開始のみ入力できます。</p></fieldset><label>作業内容<input name="title" defaultValue={timeline?.title} placeholder="例：本番デプロイ" required /></label><label>担当者<input name="owner" defaultValue={timeline?.owner} placeholder="例：田中" required /></label></>}
+    {type === "timeline" && <><div className="field-row"><label>区分<select name="plan" defaultValue={timeline?.plan || "本線"}><option>本線</option><option>コンチプラン</option></select></label><label>状態<select name="status" defaultValue={timeline?.status || "未着手"}><option>未着手</option><option>進行中</option><option>完了</option></select></label></div><fieldset className="time-fieldset"><legend>予定</legend><div className="field-row"><label>作業日<input name="workDate" type="date" defaultValue={plannedStartAt.slice(0, 10)} required /></label><label>終了日<input name="endDate" type="date" defaultValue={plannedEndAt.slice(0, 10)} required /></label></div><div className="field-row"><label>開始時刻<input name="startTime" type="time" step="300" defaultValue={plannedStartAt.slice(11, 16)} required /></label><label>終了時刻<input name="endTime" type="time" step="300" defaultValue={plannedEndAt.slice(11, 16)} required /></label></div><div className="duration-presets"><span>開始から</span>{[15, 30, 60].map((minutes) => <button type="button" key={minutes} onClick={(event) => setPlannedDuration(event.currentTarget, minutes)}>＋{minutes}分</button>)}</div><p className="field-help">作業日と開始時刻は親作業の予定日時を初期表示します。日を跨ぐ場合は終了日を変更できます。</p></fieldset><fieldset className="time-fieldset actual"><legend>実績（任意）</legend><div className="field-row"><div className="actual-datetime-field"><label>実績開始日時<input name="actualStartAt" type="datetime-local" defaultValue={timeline?.actualStartAt} /></label><button type="button" className="set-now-button" onClick={(event) => setCurrentDateTime(event.currentTarget, "actualStartAt")}>◷ 今を開始に設定</button></div><div className="actual-datetime-field"><label>実績終了日時<input name="actualEndAt" type="datetime-local" defaultValue={timeline?.actualEndAt} /></label><button type="button" className="set-now-button" onClick={(event) => setCurrentDateTime(event.currentTarget, "actualEndAt")}>◷ 今を終了に設定</button></div></div><p className="field-help">作業中は実績開始のみ入力できます。</p></fieldset><label>作業内容<input name="title" defaultValue={timeline?.title} placeholder="例：本番デプロイ" required /></label><label>担当者<input name="owner" defaultValue={timeline?.owner} placeholder="例：田中" required /></label></>}
     {type === "approval" && <><label>申請名<input name="title" defaultValue={approval?.title} required autoFocus /></label><div className="field-row"><label>担当者<input name="owner" defaultValue={approval?.owner} required /></label><label>状態<select name="status" defaultValue={approval?.status || "未申請"}><option>未申請</option><option>申請中</option><option>承認済み</option></select></label></div><label>期限<input name="due" defaultValue={approval?.due} placeholder="7/22" required /></label><label>申請リンク<input name="url" inputMode="url" defaultValue={approval?.url} placeholder="https://... または社内パス" required /></label></>}
     {type === "link" && <><label>タイトル<input name="title" defaultValue={link?.title} required autoFocus /></label><label>カテゴリ<input name="category" defaultValue={link?.category} placeholder="手順書" required /></label><label>説明<input name="description" defaultValue={link?.description} required /></label><label>URL<input name="url" inputMode="url" defaultValue={link?.url} placeholder="https://... または社内パス" required /></label></>}
     <div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose}>キャンセル</button><button type="submit" className="primary-button" disabled={saving}>{saving ? "保存中" : editing ? "変更を保存" : type === "work" ? "登録して明細へ" : "追加する"}</button></div>
