@@ -205,9 +205,9 @@ erDiagram
 | `id` | number | Yes | 申請物内ID |
 | `title` | string | Yes | 申請名 |
 | `owner` | string | Yes | 担当者 |
-| `due` | string | Yes | 期限（表示用文字列） |
-| `status` | enum | Yes | 未申請／申請中／承認済み |
-| `url` | string | Yes | 申請先リンク |
+| `due` | string | Yes | 期限（`YYYY-MM-DD`） |
+| `status` | enum | Yes | 未申請／申請中／回付済／結了済 |
+| `url` | string | No | 申請先リンク。未登録は空文字 |
 
 ### 5.6 ResourceLink
 
@@ -217,7 +217,7 @@ erDiagram
 | `title` | string | Yes | タイトル |
 | `description` | string | Yes | 説明 |
 | `category` | string | Yes | 手順書、監視等の分類 |
-| `url` | string | Yes | 遷移先 |
+| `url` | string | No | 遷移先。未登録は空文字 |
 
 ## 6. 共有API・永続化設計
 

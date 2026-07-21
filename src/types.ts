@@ -1,6 +1,6 @@
 export type TimelineStatus = "未着手" | "進行中" | "完了";
 export type TimelinePlan = "本線" | "コンチプラン";
-export type ApprovalStatus = "未申請" | "申請中" | "承認済み";
+export type ApprovalStatus = "未申請" | "申請中" | "回付済" | "結了済";
 
 export type TimelineItem = {
   id: number;

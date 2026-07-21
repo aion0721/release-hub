@@ -25,9 +25,9 @@ export const sampleWork: ReleaseWork = {
     { id: 2, name: "田中", phone: "080-1234-5678", startAt: "2026-07-24T21:00", endAt: "2026-07-25T01:00", location: "オンコール", note: "一次連絡先" },
   ],
   approvals: [
-    { id: 1, title: "本番変更申請", owner: "田中", due: "7/22", status: "承認済み", url: "#" },
-    { id: 2, title: "メンテナンス告知", owner: "佐藤", due: "7/23", status: "申請中", url: "#" },
-    { id: 3, title: "リリース判定票", owner: "鈴木", due: "7/24", status: "未申請", url: "#" },
+    { id: 1, title: "本番変更申請", owner: "田中", due: "2026-07-22", status: "結了済", url: "#" },
+    { id: 2, title: "メンテナンス告知", owner: "佐藤", due: "2026-07-23", status: "回付済", url: "#" },
+    { id: 3, title: "リリース判定票", owner: "鈴木", due: "2026-07-24", status: "未申請", url: "" },
   ],
   links: [
     { id: 1, title: "本番リリース手順書", description: "デプロイから確認までの標準手順", category: "手順書", url: "#" },
