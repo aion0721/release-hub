@@ -74,6 +74,8 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(app, /AllInOneList/);
   assert.doesNotMatch(app, /≋ 統合/);
   assert.match(app, /Math\.round\(rawDelta \/ 5\) \* 5/);
+  assert.match(app, /lockedRangeRef/);
+  assert.doesNotMatch(app, /Math\.max\(2\.5, \(\(end - start\)/);
   assert.match(app, /getTimezoneOffset\(\) \* 60_000/);
   assert.match(app, /setInterval\(\(\) => setCurrentMinute\(currentLocalMinutes\(\)\), 30_000\)/);
   assert.match(app, /\[15, 30, 60\]\.map/);
@@ -82,6 +84,8 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(app, /name="due" type="date"/);
   assert.doesNotMatch(app, /name="url"[^>]*required/);
   assert.match(app, /status === "承認済み"\) return "結了済"/);
+  const timelineModalSource = app.slice(app.indexOf('{type === "timeline"'), app.indexOf('{type === "approval"'));
+  assert.ok(timelineModalSource.indexOf('name="title"') < timelineModalSource.indexOf('name="plan"'));
   const previewSource = app.slice(app.indexOf("function PreviewModal"));
   assert.doesNotMatch(previewSource, /onClick=\{onClose\}>閉じる<\/button>/);
   assert.match(apiClient, /\/v2\/releases/);
