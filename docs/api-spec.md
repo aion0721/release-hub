@@ -88,6 +88,7 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
 - 一覧用の進捗、作業件数、申請件数はSPAがReleaseRecordから計算する。
 - `updatedAt`はSPAが保存操作時に更新する。
 - `updatedBy`は新規登録時に責任者を初期値とする。利用者識別が必要な場合は認証基盤側で別途設計する。
+- `release.version`は任意で、未設定時は空文字を保存する。
 
 ## 5. エンドポイント一覧
 

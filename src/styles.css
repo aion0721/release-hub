@@ -28,6 +28,8 @@ button.nav-item { width:100%; border:0; background:transparent; text-align:left;
 .eyebrow,.section-kicker { display:block; color:#7b8da5; font-size:10px; font-weight:800; letter-spacing:.18em; }
 .topbar h1 { margin:5px 0 0; font-size:25px; letter-spacing:-.035em; }
 .list-topbar p { margin:8px 0 0; color:#748196; font-size:12px; }
+.list-actions { display:flex; align-items:center; gap:8px; }
+.list-actions .primary-button { margin-left:4px; }
 .top-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; color:#64748b; font-size:12px; }
 .live-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 4px #dcfce7; }
 .live-dot.saving { background:#f59e0b; box-shadow:0 0 0 4px #fef3c7; }
@@ -408,7 +410,8 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
   .staffing-label { padding-left:17px; }
   .gantt-label { padding-left:17px; }
   .list-topbar { display:grid; }
-  .list-topbar .primary-button { justify-self:start; margin:0; }
+  .list-actions { justify-self:start; flex-wrap:wrap; }
+  .list-topbar .primary-button { margin:0; }
   .work-list-heading { align-items:flex-start; }
   .work-view-controls { align-items:stretch; flex-direction:column; }
   .work-view-controls .list-count { align-self:flex-end; }

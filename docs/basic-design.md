@@ -164,7 +164,7 @@ erDiagram
 | `id` | number | Yes | リリース作業ID |
 | `systemId` | string | Yes | 対象システム識別子 |
 | `name` | string | Yes | 作業名 |
-| `version` | string | Yes | 対象バージョン |
+| `version` | string | No | 対象バージョン。未設定時は空文字 |
 | `releaseDate` | string | Yes | 親作業日時。`YYYY-MM-DD HH:mm` |
 | `environment` | string | Yes | Production等の環境 |
 | `status` | string | Yes | 準備中／進行中／完了 |
