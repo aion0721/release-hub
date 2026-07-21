@@ -236,6 +236,16 @@ const server = createServer(async (request, response) => {
       sendJson(response, updated ? 200 : 404, updated || { error: "Resource item not found" });
       return;
     }
+    if (releaseMatch && method === "DELETE") {
+      const id = Number(releaseMatch[1]);
+      const deleted = await mutateDatabase((records) => {
+        const index = records.findIndex((item) => item.id === id);
+        if (index < 0) return null;
+        return records.splice(index, 1)[0];
+      });
+      sendJson(response, deleted ? 200 : 404, deleted || { error: "Resource item not found" });
+      return;
+    }
     if (method === "GET" || method === "HEAD") { await serveStatic(pathname, response, method); return; }
     sendJson(response, 405, { error: "Method not allowed" });
   } catch (error) {

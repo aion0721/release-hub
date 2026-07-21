@@ -88,3 +88,7 @@ export async function saveReleaseWork(work: ReleaseWork) {
   });
   return workFromRecord(saved);
 }
+
+export async function deleteReleaseWork(id: number) {
+  await request<ReleaseRecord>(`${releasesPath}/${id}`, { method: "DELETE" });
+}

@@ -98,9 +98,10 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
 | POST | `/v2/releases` | ReleaseRecord作成 |
 | GET | `/v2/releases/:id` | 1件取得 |
 | PUT | `/v2/releases/:id` | 1件全置換 |
+| DELETE | `/v2/releases/:id` | 親作業と配下明細を削除 |
 | OPTIONS | 任意 | CORSプリフライト |
 
-light-api-server自体はPATCH、DELETE、クエリ絞り込みも提供するが、現行Release Hubの画面は使用しない。
+light-api-server自体はPATCHとクエリ絞り込みも提供するが、現行Release Hubの画面は使用しない。一覧のSystemID・状態フィルターは取得済みReleaseRecordへSPA側で適用する。
 
 ## 6. GET /health
 
@@ -162,7 +163,18 @@ SPAは入力値から空の明細配列を持つReleaseWorkを組み立てて送
 | 400 | URLとbodyのID不一致、JSON不正 |
 | 404 | 対象なし |
 
-## 11. エラー処理
+## 11. DELETE /v2/releases/:id
+
+詳細画面の削除確認モーダルで確定した作業を、配下明細を含むReleaseRecord単位で削除する。
+
+| Status | 条件 |
+| --- | --- |
+| 200 | 削除成功。削除したReleaseRecordを返す |
+| 404 | 対象なし |
+
+削除成功後、SPAは一覧のサマリーから対象IDを除外して一覧画面へ戻る。削除の取消・復元は提供しない。
+
+## 12. エラー処理
 
 light-api-serverのv2エラーは次の形式で返る。
 
@@ -172,7 +184,7 @@ light-api-serverのv2エラーは次の形式で返る。
 
 SPAは404を「対象の作業が見つかりません」、その他を「共有データを処理できませんでした」へ変換し、楽観更新に失敗した場合は直前の画面状態へ戻す。
 
-## 12. データ移行
+## 13. データ移行
 
 旧形式は `DATA_DIR/release.json` の `{ "releases": ReleaseWork[] }` である。次のコマンドで `DATA_DIR/releases.json` のReleaseRecord配列へ変換する。
 
@@ -190,7 +202,7 @@ npm run migrate:data
 
 既存の `releases.json` は上書きしない。移行後のファイルをlight-api-serverの `DATA_DIR`へ配置してから起動する。
 
-## 13. 永続化と制約
+## 14. 永続化と制約
 
 - light-api-serverが書き込みをリソース単位に直列化する。
 - 一時ファイルを書いた後にrenameで `releases.json`を置換する。

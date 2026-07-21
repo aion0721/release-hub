@@ -1,5 +1,5 @@
 import { type CSSProperties, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createReleaseWork, fetchReleaseSummaries, fetchReleaseWork, saveReleaseWork } from "./api";
+import { createReleaseWork, deleteReleaseWork, fetchReleaseSummaries, fetchReleaseWork, saveReleaseWork } from "./api";
 import { sampleWork } from "./sampleData";
 import type { ApprovalItem, CreateReleaseInput, ReleaseSummary, ReleaseWork, ResourceLink, StaffingAssignment, TimelineItem, TimelinePlan, TimelineStatus } from "./types";
 
@@ -42,6 +42,7 @@ export default function App() {
   const [modal, setModal] = useState<ModalType | null>(null);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [preview, setPreview] = useState<PreviewItem | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const loadSummaries = useCallback(async () => {
     if (demoMode) {
@@ -116,6 +117,31 @@ export default function App() {
     } catch (reason) {
       setSelected(previous);
       setError(reason instanceof Error ? reason.message : "保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteSelectedWork() {
+    if (!selected) return;
+    const id = selected.release.id;
+    if (demoMode) {
+      setDemoWorks((current) => current.filter((work) => work.release.id !== id));
+      setSummaries((current) => current.filter((summary) => summary.id !== id));
+      setSelected(null);
+      setDeleteConfirmOpen(false);
+      setError("");
+      return;
+    }
+    setSaving(true);
+    try {
+      await deleteReleaseWork(id);
+      setSummaries((current) => current.filter((summary) => summary.id !== id));
+      setSelected(null);
+      setDeleteConfirmOpen(false);
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "作業を削除できませんでした");
     } finally {
       setSaving(false);
     }
@@ -272,13 +298,14 @@ export default function App() {
       <section className="content">
         {error && <div className="error-banner">{error} — API起動前はサンプルデータを表示します</div>}
         {selected ? (
-          <WorkDetail work={selected} loading={loading} saving={saving} onBack={() => setSelected(null)} onOpenModal={openModal} onOpenEditor={openEditor} onOpenPreview={setPreview} onReorderTimeline={reorderTimeline} onUpdateTimelineTime={updateTimelineTime} onUpdateStaffingTime={updateStaffingTime} />
+          <WorkDetail work={selected} loading={loading} saving={saving} onBack={() => setSelected(null)} onDelete={() => setDeleteConfirmOpen(true)} onOpenModal={openModal} onOpenEditor={openEditor} onOpenPreview={setPreview} onReorderTimeline={reorderTimeline} onUpdateTimelineTime={updateTimelineTime} onUpdateStaffingTime={updateStaffingTime} />
         ) : (
           <WorkList summaries={summaries} loading={loading} onCreate={() => openModal("work")} onOpen={openWork} />
         )}
       </section>
       {modal && <ItemModal type={modal} editTarget={editTarget} releaseDate={selected?.release.releaseDate} saving={saving} onClose={closeModal} onSubmit={submitItem} />}
       {preview && <PreviewModal preview={preview} onClose={() => setPreview(null)} onEdit={(target) => openEditor(target)} />}
+      {deleteConfirmOpen && selected && <DeleteConfirmModal work={selected} saving={saving} onClose={() => setDeleteConfirmOpen(false)} onConfirm={() => void deleteSelectedWork()} />}
     </main>
   );
 }
@@ -321,10 +348,12 @@ function formatMonth(month: string) {
 function WorkList({ summaries, loading, onCreate, onOpen }: { summaries: ReleaseSummary[]; loading: boolean; onCreate: () => void; onOpen: (id: number) => void }) {
   const [view, setView] = useState<"list" | "calendar">("list");
   const [systemFilter, setSystemFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "completed">("all");
   const [calendarMonth, setCalendarMonth] = useState(() => summaries[0]?.releaseDate.slice(0, 7) || new Date().toISOString().slice(0, 7));
   const systemIds = useMemo(() => [...new Set(summaries.map((item) => item.systemId))].sort((a, b) => a.localeCompare(b, "ja")), [summaries]);
-  const filtered = useMemo(() => systemFilter === "all" ? summaries : summaries.filter((item) => item.systemId === systemFilter), [summaries, systemFilter]);
-  const activeCount = filtered.filter((item) => item.status !== "完了").length;
+  const systemFiltered = useMemo(() => systemFilter === "all" ? summaries : summaries.filter((item) => item.systemId === systemFilter), [summaries, systemFilter]);
+  const filtered = useMemo(() => systemFiltered.filter((item) => statusFilter === "all" || (statusFilter === "completed" ? item.status === "完了" : item.status !== "完了")), [systemFiltered, statusFilter]);
+  const activeCount = systemFiltered.filter((item) => item.status !== "完了").length;
   const calendarDays = useMemo(() => buildCalendarDays(calendarMonth), [calendarMonth]);
   return <>
     <header className="topbar list-topbar"><div><span className="eyebrow">RELEASE WORKS</span><h1>リリース作業</h1><p>SystemIDごと、または全体の作業予定を一覧・カレンダーで確認できます。</p></div><button className="primary-button" onClick={onCreate}>＋ 新しい作業を登録</button></header>
@@ -334,25 +363,25 @@ function WorkList({ summaries, loading, onCreate, onOpen }: { summaries: Release
       <div><span>今後の流れ</span><ol><li><i>1</i>作業を登録</li><li><i>2</i>明細を追加</li><li><i>3</i>当日の進捗を更新</li></ol></div>
     </section>
     <section className="panel work-list-panel">
-      <div className="panel-heading work-list-heading"><div><span className="section-kicker">{view === "list" ? "RELEASE QUEUE" : "RELEASE CALENDAR"}</span><h2>{view === "list" ? "作業を選択" : "作業カレンダー"}</h2></div><div className="work-view-controls"><label>SystemID<select value={systemFilter} onChange={(event) => setSystemFilter(event.target.value)} aria-label="SystemIDで絞り込み"><option value="all" key="all">すべて</option>{systemIds.map((systemId) => <option value={systemId} key={systemId}>{systemId}</option>)}</select></label><div className="view-switch" aria-label="作業表示"><button className={view === "list" ? "active" : ""} onClick={() => setView("list")} aria-pressed={view === "list"}>☷ リスト</button><button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")} aria-pressed={view === "calendar"}>▦ カレンダー</button></div><span className="list-count">{filtered.length}件</span></div></div>
+      <div className="panel-heading work-list-heading"><div><span className="section-kicker">{view === "list" ? "RELEASE QUEUE" : "RELEASE CALENDAR"}</span><h2>{view === "list" ? "作業を選択" : "作業カレンダー"}</h2></div><div className="work-view-controls"><label>SystemID<select value={systemFilter} onChange={(event) => setSystemFilter(event.target.value)} aria-label="SystemIDで絞り込み"><option value="all" key="all">すべて</option>{systemIds.map((systemId) => <option value={systemId} key={systemId}>{systemId}</option>)}</select></label><label>作業状態<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | "active" | "completed")} aria-label="作業状態で絞り込み"><option value="all">すべて</option><option value="active">未完了</option><option value="completed">完了</option></select></label><div className="view-switch" aria-label="作業表示"><button className={view === "list" ? "active" : ""} onClick={() => setView("list")} aria-pressed={view === "list"}>☷ リスト</button><button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")} aria-pressed={view === "calendar"}>▦ カレンダー</button></div><span className="list-count">{filtered.length}件</span></div></div>
       {view === "list" ? <><div className="work-table-head"><span>作業名</span><span>SystemID</span><span>作業日時</span><span>責任者</span><span>進捗</span><span>状態</span><span /></div><div className="work-list">
         {filtered.map((work) => <button className="work-row" key={work.id} onClick={() => onOpen(work.id)} disabled={loading}>
           <span className="work-title"><i>{work.name.slice(0, 1)}</i><span><strong>{work.name}</strong><small>{work.version}・{work.environment}</small></span></span><span className="system-id-badge">{work.systemId}</span>
           <span className="work-date">{work.releaseDate}</span><span>{work.manager}</span><span className="row-progress"><span><i style={{ width: `${work.progress}%` }} /></span><b>{work.progress}%</b><small>{work.timelineCount}工程</small></span><span><em className={`release-status release-status-${work.status}`}>{work.status}</em></span><span className="row-arrow">›</span>
         </button>)}
-        {!filtered.length && <div className="empty-state"><span>＋</span><h3>{summaries.length ? "該当する作業はありません" : "最初の作業を登録しましょう"}</h3><p>{summaries.length ? "SystemIDの絞り込みを変更してください。" : "登録後にタイムチャートや申請物を追加できます。"}</p>{!summaries.length && <button className="primary-button" onClick={onCreate}>作業を登録</button>}</div>}
+        {!filtered.length && <div className="empty-state"><span>＋</span><h3>{summaries.length ? "該当する作業はありません" : "最初の作業を登録しましょう"}</h3><p>{summaries.length ? "SystemIDまたは作業状態の絞り込み条件を変更してください。" : "登録後にタイムチャートや申請物を追加できます。"}</p>{!summaries.length && <button className="primary-button" onClick={onCreate}>作業を登録</button>}</div>}
       </div></> : <div className="release-calendar"><div className="calendar-toolbar"><button type="button" onClick={() => setCalendarMonth((month) => shiftMonth(month, -1))} aria-label="前の月">‹</button><strong>{formatMonth(calendarMonth)}</strong><button type="button" onClick={() => setCalendarMonth((month) => shiftMonth(month, 1))} aria-label="次の月">›</button></div><div className="calendar-weekdays">{["日", "月", "火", "水", "木", "金", "土"].map((day) => <span key={day}>{day}</span>)}</div><div className="calendar-grid">{calendarDays.map((day) => { const works = filtered.filter((work) => work.releaseDate.slice(0, 10) === day.value); return <div className={`calendar-day ${day.inMonth ? "" : "outside"}`} key={day.value}><span className="calendar-day-number">{day.day}</span><div className="calendar-events">{works.map((work) => <button type="button" key={work.id} onClick={() => onOpen(work.id)} disabled={loading} aria-label={`${work.name}の詳細を開く`}><span>{work.releaseDate.slice(11, 16)}</span><strong>{work.name}</strong><small>{work.systemId}</small></button>)}</div></div>; })}</div></div>}
     </section>
   </>;
 }
 
-function WorkDetail({ work, loading, saving, onBack, onOpenModal, onOpenEditor, onOpenPreview, onReorderTimeline, onUpdateTimelineTime, onUpdateStaffingTime }: { work: ReleaseWork; loading: boolean; saving: boolean; onBack: () => void; onOpenModal: (type: ModalType) => void; onOpenEditor: (target: EditTarget) => void; onOpenPreview: (preview: PreviewItem) => void; onReorderTimeline: (sourceId: number, targetId: number | null, targetPlan: TimelinePlan) => void; onUpdateTimelineTime: (id: number, startAt: string, endAt: string) => void; onUpdateStaffingTime: (id: number, startAt: string, endAt: string) => void }) {
+function WorkDetail({ work, loading, saving, onBack, onDelete, onOpenModal, onOpenEditor, onOpenPreview, onReorderTimeline, onUpdateTimelineTime, onUpdateStaffingTime }: { work: ReleaseWork; loading: boolean; saving: boolean; onBack: () => void; onDelete: () => void; onOpenModal: (type: ModalType) => void; onOpenEditor: (target: EditTarget) => void; onOpenPreview: (preview: PreviewItem) => void; onReorderTimeline: (sourceId: number, targetId: number | null, targetPlan: TimelinePlan) => void; onUpdateTimelineTime: (id: number, startAt: string, endAt: string) => void; onUpdateStaffingTime: (id: number, startAt: string, endAt: string) => void }) {
   const [timelineView, setTimelineView] = useState<"list" | "gantt">("list");
   const progress = useMemo(() => work.timeline.length ? Math.round((work.timeline.filter((item) => item.status === "完了").length / work.timeline.length) * 100) : 0, [work.timeline]);
   const completed = work.timeline.filter((item) => item.status === "完了").length;
   const approved = work.approvals.filter((item) => item.status === "承認済み").length;
   return <>
-    <header className="topbar"><div><button className="back-button" onClick={onBack}>‹ 作業一覧</button><span className="eyebrow">RELEASE CONTROL CENTER</span><h1>{work.release.name}</h1></div><div className="top-actions"><span className={`live-dot ${saving ? "saving" : ""}`} /><span>{saving ? "保存中" : "共有済み"}</span><button className="ghost-button" onClick={() => onOpenEditor({ type: "work", item: work.release })}>作業情報を編集</button><button className="primary-button" onClick={() => onOpenModal("timeline")}>＋ 作業明細を追加</button></div></header>
+    <header className="topbar"><div><button className="back-button" onClick={onBack}>‹ 作業一覧</button><span className="eyebrow">RELEASE CONTROL CENTER</span><h1>{work.release.name}</h1></div><div className="top-actions"><span className={`live-dot ${saving ? "saving" : ""}`} /><span>{saving ? "保存中" : "共有済み"}</span><button className="danger-button" onClick={onDelete} disabled={loading || saving}>作業を削除</button><button className="ghost-button" onClick={() => onOpenEditor({ type: "work", item: work.release })}>作業情報を編集</button><button className="primary-button" onClick={() => onOpenModal("timeline")}>＋ 作業明細を追加</button></div></header>
     <div id="overview" className="release-banner"><div className="release-main"><span className="status-pill">{work.release.status}</span><h2>{work.release.version}</h2><p><span className="system-id-badge">{work.release.systemId}</span>{work.release.environment} 環境</p></div><div className="release-meta"><div><span>実施日時</span><strong>{work.release.releaseDate}</strong></div><div><span>責任者</span><strong>{work.release.manager}</strong></div><div><span>作業進捗</span><strong>{progress}%</strong></div><div className="progress-track"><i style={{ width: `${progress}%` }} /></div></div></div>
     <div className="summary-grid"><article className="metric-card"><span className="metric-icon blue">◷</span><div><small>作業項目</small><strong>{work.timeline.length}</strong><em>件</em></div><p>{completed}件 完了</p></article><article className="metric-card"><span className="metric-icon purple">♙</span><div><small>当日体制</small><strong>{work.staffing.length}</strong><em>名</em></div><p>対応メンバー</p></article><article className="metric-card"><span className="metric-icon green">✓</span><div><small>申請・承認</small><strong>{approved}</strong><em>/{work.approvals.length}</em></div><p>承認済み</p></article><article className="metric-card"><span className="metric-icon amber">↗</span><div><small>関連資料</small><strong>{work.links.length}</strong><em>件</em></div><p>すぐにアクセス</p></article></div>
     <div className="workspace-grid"><section id="timeline" className={`panel timeline-panel ${timelineView === "gantt" ? "gantt-panel" : ""}`}><div className="panel-heading"><div><span className="section-kicker">ALL-IN-ONE</span><h2>当日オペレーション</h2><p className="timeline-drag-hint">{timelineView === "list" ? "作業と当日体制を一覧で編集。作業行は上下にドラッグ可能" : "作業と当日体制を同じ時間軸で表示。各バーは5分単位でドラッグ変更"}</p></div><div className="panel-actions"><div className="view-switch" aria-label="オールインワン表示"><button className={timelineView === "list" ? "active" : ""} onClick={() => setTimelineView("list")} aria-pressed={timelineView === "list"}>☷ リスト</button><button className={timelineView === "gantt" ? "active" : ""} onClick={() => setTimelineView("gantt")} aria-pressed={timelineView === "gantt"}>▥ ガント</button></div><button className="ghost-button" onClick={() => onOpenModal("staffing")}>＋ 体制</button><button className="primary-button compact-button" onClick={() => onOpenModal("timeline")}>＋ 作業</button></div></div>{timelineView === "list" ? <AllInOneList items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEditTimeline={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} onReorder={onReorderTimeline} /> : <GanttChart items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEdit={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} onTimeChange={onUpdateTimelineTime} onStaffingTimeChange={onUpdateStaffingTime} />}</section>
@@ -543,6 +572,11 @@ function setPlannedDuration(button: HTMLButtonElement, minutes: number) {
   endDateInput.value = endAt.slice(0, 10);
   endTimeInput.value = endAt.slice(11, 16);
   endTimeInput.focus();
+}
+
+function DeleteConfirmModal({ work, saving, onClose, onConfirm }: { work: ReleaseWork; saving: boolean; onClose: () => void; onConfirm: () => void }) {
+  const detailCount = work.timeline.length + work.staffing.length + work.approvals.length + work.links.length;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><div className="modal delete-confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-description" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="section-kicker danger">DELETE RELEASE WORK</span><h2 id="delete-confirm-title">リリース作業を削除しますか？</h2></div><button onClick={onClose} aria-label="閉じる" disabled={saving}>×</button></div><div className="delete-confirm-body"><strong>{work.release.name}</strong><p id="delete-confirm-description">タイムチャート、当日体制、申請物、関連リンクを含む{detailCount}件の明細も削除されます。この操作は取り消せません。</p></div><div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose} disabled={saving}>キャンセル</button><button type="button" className="danger-button solid" onClick={onConfirm} disabled={saving}>{saving ? "削除中" : "作業を削除する"}</button></div></div></div>;
 }
 
 function ItemModal({ type, editTarget, releaseDate, saving, onClose, onSubmit }: { type: ModalType; editTarget: EditTarget | null; releaseDate?: string; saving: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
