@@ -60,6 +60,10 @@ export type ReleaseWork = {
   links: ResourceLink[];
 };
 
+export type ReleaseRecord = ReleaseWork & {
+  id: number;
+};
+
 export type ReleaseSummary = ReleaseWork["release"] & {
   progress: number;
   timelineCount: number;

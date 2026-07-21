@@ -137,24 +137,24 @@ npm test
 
 | ID | 条件 | 期待結果 |
 | --- | --- | --- |
-| API-001 | GET `/health` | 200と `{status: ok}` |
-| API-002 | GET `/api/releases` | ID降順のサマリー配列 |
-| API-003 | 正常なPOST | 201、最大ID＋1、準備中、空明細 |
-| API-004 | 必須不足のPOST | 400 |
+| API-001 | GET `/health` | 200と `{status: ok, version: 2}` |
+| API-002 | GET `/v2/releases` | トップレベルIDを持つReleaseRecord配列 |
+| API-003 | 正常なPOST | 201、トップレベルID自動採番、空明細 |
+| API-004 | SPAからの正常なPOST | ReleaseRecord全項目と空明細が送信される |
 | API-005 | 存在するIDのGET | 200と作業全体 |
 | API-006 | 存在しないIDのGET | 404 |
-| API-007 | 正常なPUT | 200、全体保存、updatedBy/At更新 |
+| API-007 | 正常なPUT | 200、ReleaseRecord全体保存 |
 | API-008 | URLとbodyのID不一致PUT | 400 |
 | API-009 | 存在しないIDのPUT | 404 |
 | API-010 | DELETE | 405 |
-| API-011 | 1,000,000文字を超えるボディ | 500とサイズ超過エラー |
-| API-012 | CORS_ORIGINありのOPTIONS | 204と許可ヘッダー |
+| API-011 | 1,000,000バイトを超えるボディ | 413とサイズ超過エラー |
+| API-012 | CORS設定ありのOPTIONS | 200と許可ヘッダー |
 
 ## 8. データ移行試験
 
 | ID | 旧データ | 期待結果 |
 | --- | --- | --- |
-| MIG-001 | 単一ReleaseWorkルート | releases配列へ変換される |
+| MIG-001 | 単一ReleaseWorkルート | トップレベルID付きReleaseRecord配列へ変換される |
 | MIG-002 | systemIdなし | 未設定で補完される |
 | MIG-003 | managerなし | updatedByまたは未設定で補完される |
 | MIG-004 | staffingなし | 空配列で補完される |

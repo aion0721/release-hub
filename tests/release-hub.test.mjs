@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -35,26 +35,32 @@ async function requestJson(url, init) {
 }
 
 async function createRelease(baseUrl, overrides = {}) {
-  const { response, body } = await requestJson(`${baseUrl}/api/releases`, {
+  const input = { systemId: "MEMBER", name: "会員基盤リリース", version: "v1.3.0", releaseDate: "2026-08-01 22:00", environment: "Production", manager: "山田", ...overrides };
+  const work = {
+    release: { id: 0, ...input, status: "準備中", updatedBy: input.manager, updatedAt: new Date().toISOString() },
+    timeline: [], staffing: [], approvals: [], links: [],
+  };
+  const { response, body } = await requestJson(`${baseUrl}/v2/releases`, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-forwarded-user": "test-user" },
-    body: JSON.stringify({ systemId: "MEMBER", name: "会員基盤リリース", version: "v1.3.0", releaseDate: "2026-08-01 22:00", environment: "Production", manager: "山田", ...overrides }),
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(work),
   });
   assert.equal(response.status, 201);
   return body;
 }
 
 async function saveRelease(baseUrl, work) {
-  return requestJson(`${baseUrl}/api/releases/${work.release.id}`, {
+  return requestJson(`${baseUrl}/v2/releases/${work.release.id}`, {
     method: "PUT",
-    headers: { "content-type": "application/json", "x-forwarded-user": "test-user" },
-    body: JSON.stringify(work),
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...work, id: work.release.id }),
   });
 }
 
 test("SPA contains editable release-operation controls", async () => {
-  const [app, html] = await Promise.all([
+  const [app, apiClient, html] = await Promise.all([
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/api.ts", import.meta.url), "utf8"),
     readFile(new URL("../index.html", import.meta.url), "utf8"),
   ]);
   for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "SystemIDで絞り込み", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "手順書・関連リンク", "リンク情報を編集", "情報を編集", "リンクを開く"]) {
@@ -72,6 +78,9 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(app, /setInterval\(\(\) => setCurrentMinute\(currentLocalMinutes\(\)\), 30_000\)/);
   assert.match(app, /\[15, 30, 60\]\.map/);
   assert.match(app, /values\.startAt =/);
+  assert.match(apiClient, /\/v2\/releases/);
+  assert.match(apiClient, /recordFromWork/);
+  assert.match(apiClient, /summaryFromRecord/);
   assert.match(html, /Release Hub \| リリース情報をひとつに/);
 });
 
@@ -98,11 +107,11 @@ test("project documentation covers current product, API, design, and acceptance 
   for (const path of ["docs/requirements.md", "docs/basic-design.md", "docs/api-spec.md", "docs/test-spec.md"]) assert.match(readme, new RegExp(path));
   for (const term of ["SystemID", "コンチプラン", "表示範囲外", "VITE_DEMO_MODE"]) assert.match(requirements, new RegExp(term));
   for (const term of ["mermaid", "release.json", "GitLab CI", "GitHub Actions"]) assert.match(design, new RegExp(term));
-  for (const endpoint of ["GET /health", "GET /api/releases", "POST /api/releases", "PUT /api/releases/:id"]) assert.match(api, new RegExp(endpoint));
+  for (const endpoint of ["GET /health", "GET /v2/releases", "POST /v2/releases", "PUT /v2/releases/:id"]) assert.match(api, new RegExp(endpoint));
   for (const testId of ["FT-020", "FT-046", "API-007", "MIG-006", "NFT-008"]) assert.match(testSpec, new RegExp(testId));
 });
 
-test("development command starts both the SPA and Node API", async () => {
+test("development command starts both the SPA and v2-compatible local API", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const devScript = await readFile(new URL("../scripts/dev.mjs", import.meta.url), "utf8");
   assert.equal(packageJson.scripts.dev, "node scripts/dev.mjs");
@@ -112,7 +121,7 @@ test("development command starts both the SPA and Node API", async () => {
   assert.match(devScript, /node_modules\/vite\/bin\/vite\.js/);
 });
 
-test("Node API migrates legacy time-only details across midnight", async (context) => {
+test("v2-compatible local API migrates legacy time-only details across midnight", async (context) => {
   const baseUrl = await startServer(context);
   const created = await createRelease(baseUrl);
   delete created.release.systemId;
@@ -139,12 +148,13 @@ test("Node API migrates legacy time-only details across midnight", async (contex
   assert.equal("startTime" in saved.staffing[0], false);
 });
 
-test("Node API persists work edits, contact details, plan types, and timeline order", async (context) => {
+test("v2-compatible local API persists release records and work edits", async (context) => {
   const baseUrl = await startServer(context);
-  const initial = await requestJson(`${baseUrl}/api/releases`);
+  const initial = await requestJson(`${baseUrl}/v2/releases`);
   assert.equal(initial.response.status, 200);
-  assert.equal(initial.body[0].name, "決済基盤アップデート");
-  assert.equal(initial.body[0].systemId, "PAYMENT");
+  assert.equal(initial.body[0].id, 1);
+  assert.equal(initial.body[0].release.name, "決済基盤アップデート");
+  assert.equal(initial.body[0].release.systemId, "PAYMENT");
 
   const created = await createRelease(baseUrl);
   created.timeline = [
@@ -166,9 +176,9 @@ test("Node API persists work edits, contact details, plan types, and timeline or
   saved.links[0] = { ...saved.links[0], description: "改訂版", url: "https://example.com/runbook/v2" };
   const update = await saveRelease(baseUrl, saved);
   assert.equal(update.response.status, 200);
-  assert.equal(update.body.release.updatedBy, "test-user");
+  assert.equal(update.body.release.updatedBy, "山田");
 
-  const reloaded = await requestJson(`${baseUrl}/api/releases/${created.release.id}`);
+  const reloaded = await requestJson(`${baseUrl}/v2/releases/${created.release.id}`);
   assert.equal(reloaded.response.status, 200);
   assert.equal(reloaded.body.release.name, "会員基盤リリース（更新）");
   assert.equal(reloaded.body.release.systemId, "MEMBER-CORE");
@@ -184,35 +194,54 @@ test("Node API persists work edits, contact details, plan types, and timeline or
   assert.equal(reloaded.body.links[0].description, "改訂版");
   assert.equal(reloaded.body.links[0].url, "https://example.com/runbook/v2");
 
-  const summaries = await requestJson(`${baseUrl}/api/releases`);
-  assert.equal(summaries.body[0].id, created.release.id);
-  assert.equal(summaries.body[0].progress, 50);
-  assert.equal(summaries.body[0].status, "進行中");
-  assert.equal(summaries.body[0].systemId, "MEMBER-CORE");
+  const records = await requestJson(`${baseUrl}/v2/releases`);
+  const record = records.body.find((item) => item.id === created.release.id);
+  assert.equal(record.release.status, "進行中");
+  assert.equal(record.release.systemId, "MEMBER-CORE");
 });
 
-test("Node API rejects invalid mutations and reports missing resources", async (context) => {
+test("v2-compatible local API rejects invalid mutations and reports missing resources", async (context) => {
   const baseUrl = await startServer(context);
-  const invalidCreate = await requestJson(`${baseUrl}/api/releases`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "項目不足" }),
-  });
-  assert.equal(invalidCreate.response.status, 400);
-
   const created = await createRelease(baseUrl);
-  created.release.id = 999;
-  const mismatchedUpdate = await requestJson(`${baseUrl}/api/releases/2`, {
+  created.id = 999;
+  const mismatchedUpdate = await requestJson(`${baseUrl}/v2/releases/${created.release.id}`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(created),
   });
   assert.equal(mismatchedUpdate.response.status, 400);
 
-  const missing = await requestJson(`${baseUrl}/api/releases/9999`);
+  const missing = await requestJson(`${baseUrl}/v2/releases/9999`);
   assert.equal(missing.response.status, 404);
-  const unsupported = await requestJson(`${baseUrl}/api/releases`, { method: "DELETE" });
+  const unsupported = await requestJson(`${baseUrl}/v2/releases`, { method: "DELETE" });
   assert.equal(unsupported.response.status, 405);
   const health = await requestJson(`${baseUrl}/health`);
-  assert.deepEqual(health.body, { status: "ok" });
+  assert.deepEqual(health.body, { status: "ok", version: 2 });
+});
+
+test("migration command converts the legacy database into v2 release records", async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), "release-hub-migration-"));
+  const legacy = {
+    releases: [{
+      release: { id: 7, systemId: "LEGACY", name: "旧作業" },
+      timeline: [], staffing: [], approvals: [], links: [],
+    }],
+  };
+  await writeFile(join(dataDir, "release.json"), JSON.stringify(legacy), "utf8");
+  const child = spawn(process.execPath, ["scripts/migrate-data.mjs"], {
+    cwd: new URL("..", import.meta.url),
+    env: { ...process.env, DATA_DIR: dataDir },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const { code, errors } = await new Promise((resolve) => {
+    let errors = "";
+    child.stderr.on("data", (chunk) => { errors += String(chunk); });
+    child.once("exit", (code) => resolve({ code, errors }));
+  });
+  assert.equal(code, 0, errors);
+  const records = JSON.parse(await readFile(join(dataDir, "releases.json"), "utf8"));
+  assert.equal(records.length, 1);
+  assert.equal(records[0].id, 7);
+  assert.equal(records[0].release.id, 7);
+  assert.equal(records[0].release.systemId, "LEGACY");
 });

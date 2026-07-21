@@ -1,7 +1,8 @@
-import type { CreateReleaseInput, ReleaseSummary, ReleaseWork } from "./types";
+import type { CreateReleaseInput, ReleaseRecord, ReleaseSummary, ReleaseWork } from "./types";
 
 const configuredBase = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const apiBase = configuredBase.replace(/\/$/, "");
+const releasesPath = "/v2/releases";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
@@ -15,26 +16,75 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function fetchReleaseSummaries() {
-  return request<ReleaseSummary[]>("/api/releases");
+function workFromRecord(record: ReleaseRecord): ReleaseWork {
+  const { id, ...work } = record;
+  return {
+    ...work,
+    release: { ...work.release, id },
+    timeline: work.timeline ?? [],
+    staffing: work.staffing ?? [],
+    approvals: work.approvals ?? [],
+    links: work.links ?? [],
+  };
 }
 
-export function fetchReleaseWork(id: number) {
-  return request<ReleaseWork>(`/api/releases/${id}`);
+function recordFromWork(work: ReleaseWork): ReleaseRecord {
+  return { ...work, id: work.release.id };
 }
 
-export function createReleaseWork(input: CreateReleaseInput) {
-  return request<ReleaseWork>("/api/releases", {
+function summaryFromRecord(record: ReleaseRecord): ReleaseSummary {
+  const work = workFromRecord(record);
+  const done = work.timeline.filter((item) => item.status === "完了").length;
+  return {
+    ...work.release,
+    progress: work.timeline.length ? Math.round((done / work.timeline.length) * 100) : 0,
+    timelineCount: work.timeline.length,
+    approvalCount: work.approvals.length,
+  };
+}
+
+export async function fetchReleaseSummaries() {
+  const records = await request<ReleaseRecord[]>(releasesPath);
+  return records.map(summaryFromRecord).sort((left, right) => right.id - left.id);
+}
+
+export async function fetchReleaseWork(id: number) {
+  return workFromRecord(await request<ReleaseRecord>(`${releasesPath}/${id}`));
+}
+
+export async function createReleaseWork(input: CreateReleaseInput) {
+  const now = new Date().toISOString();
+  const draft: ReleaseWork = {
+    release: {
+      id: 0,
+      systemId: input.systemId.trim(),
+      name: input.name.trim(),
+      version: input.version.trim(),
+      releaseDate: input.releaseDate.trim(),
+      environment: input.environment.trim(),
+      status: "準備中",
+      manager: input.manager.trim(),
+      updatedBy: input.manager.trim(),
+      updatedAt: now,
+    },
+    timeline: [],
+    staffing: [],
+    approvals: [],
+    links: [],
+  };
+  const created = await request<ReleaseRecord>(releasesPath, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify(draft),
   });
+  return workFromRecord(created);
 }
 
-export function saveReleaseWork(work: ReleaseWork) {
-  return request<ReleaseWork>(`/api/releases/${work.release.id}`, {
+export async function saveReleaseWork(work: ReleaseWork) {
+  const saved = await request<ReleaseRecord>(`${releasesPath}/${work.release.id}`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(work),
+    body: JSON.stringify(recordFromWork(work)),
   });
+  return workFromRecord(saved);
 }

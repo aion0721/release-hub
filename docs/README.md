@@ -6,14 +6,14 @@
 | --- | --- | --- |
 | [機能仕様書](requirements.md) | 目的、利用者、画面機能、業務ルール、制約 | 利用部門、開発者、テスター |
 | [基本設計書](basic-design.md) | システム構成、画面・データ・処理・配置設計 | 開発者、運用担当者 |
-| [API仕様書](api-spec.md) | Node API の入出力、エラー、永続化、互換処理 | フロントエンド・API開発者 |
+| [API仕様書](api-spec.md) | light-api-server v2の入出力、変換、エラー、永続化 | フロントエンド・API開発者 |
 | [テスト仕様書](test-spec.md) | 自動テスト、受入試験、非機能確認 | 開発者、テスター |
 
 ## 文書管理方針
 
 - 現行実装を As-Is（現在仕様）として記載する。
 - 未実装の要望は現在仕様に混在させず、「今後の検討事項」に記載する。
-- 永続データ形状を変更する場合は、型定義、サンプル、シード、Node API、テスト、本資料を同時に更新する。
+- 永続データ形状を変更する場合は、型定義、APIアダプター、シード、移行処理、テスト、本資料を同時に更新する。
 - ユーザー向けの表示文言は日本語、コード上の識別子とAPIフィールド名は英語とする。
 
 ## 基準情報
@@ -23,6 +23,6 @@
 - 文書初版作成日: 2026-07-19
 - フロントエンド: React + Vite + TypeScript
 - バックエンド: Node.js 標準モジュール
-- 永続化: `DATA_DIR/release.json`
-- 社内向け配置: GitLab CI / Docker / Node API
+- 永続化: light-api-serverの `DATA_DIR/releases.json`
+- 社内向け配置: GitLab CI / Docker / light-api-server v2
 - 公開デモ: GitHub Actions / GitHub Pages

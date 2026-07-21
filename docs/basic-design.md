@@ -3,10 +3,10 @@
 ## 1. 設計方針
 
 - 親のリリース作業と全明細を一つの集約として扱う。
-- 通常運用はNode APIによる共有・永続化、GitHub Pagesは操作デモとして分離する。
+- 通常運用はlight-api-server v2による共有・永続化、GitHub Pagesは操作デモとして分離する。
 - 時刻はタイムゾーン変換を行わないローカル日時文字列として扱う。
 - 日跨ぎを前提に、開始・終了は日付を含む。
-- 依存を抑え、Node APIは標準モジュールだけで構成する。
+- 共有APIはNode.js標準モジュールだけで構成し、依存パッケージ0を維持する。
 - 社内認証はアプリ外のリバースプロキシ／SSOに委譲する。
 
 ## 2. システム構成
@@ -15,24 +15,23 @@
 
 ```mermaid
 flowchart LR
-  User["社内ブラウザ"] --> Proxy["社内リバースプロキシ / SSO"]
-  Proxy --> Node["Node.js Release Hub Server"]
-  Node --> SPA["dist: React SPA"]
-  Node --> API["/api/releases"]
-  API --> JSON["DATA_DIR/release.json"]
+  User["社内ブラウザ"] --> SPA["Release Hub SPA"]
+  SPA -->|"VITE_API_BASE_URL"| API["light-api-server v2"]
+  API --> REST["/v2/releases"]
+  REST --> JSON["DATA_DIR/releases.json"]
 ```
 
-- Nodeプロセスが静的ファイルとAPIを同一ポートで配信する。
-- 初回起動時にデータファイルがなければ `server/seed.json` をコピーする。
-- 更新者は `x-auth-request-email`、次に `x-forwarded-user` を参照する。
+- SPAとAPIは同一Originでも別Originでも配置できる。
+- 別Originの場合はAPIをHTTPS化し、light-api-serverのCORSにSPAのOriginを指定する。
+- Release Hub固有の処理はSPAのAPIアダプターに置き、共有APIへ専用機能を追加しない。
 
 ### 2.2 ローカル開発
 
 ```mermaid
 flowchart LR
   Browser["http://localhost:5173"] --> Vite["Vite Dev Server :5173"]
-  Vite -->|/api proxy| API["Node API :4174"]
-  API --> JSON["DATA_DIR/release.json"]
+  Vite -->|/v2 proxy| API["v2互換ローカルAPI :4174"]
+  API --> JSON["DATA_DIR/releases.json"]
 ```
 
 - `npm run dev` がViteとNode APIを子プロセスとして同時起動する。
@@ -56,11 +55,11 @@ flowchart LR
 | --- | --- | --- |
 | エントリポイント | `src/main.tsx` | Reactアプリのマウント |
 | アプリケーション | `src/App.tsx` | 画面状態、操作、モーダル、保存制御 |
-| APIクライアント | `src/api.ts` | HTTPリクエスト、APIベースURL、エラー変換 |
+| APIクライアント | `src/api.ts` | HTTPリクエスト、ReleaseRecord変換、サマリー生成、エラー変換 |
 | ドメイン型 | `src/types.ts` | リリース作業と明細のTypeScript型 |
 | サンプルデータ | `src/sampleData.ts` | API障害時フォールバック、デモ初期値 |
 | スタイル | `src/styles.css` | レイアウト、レスポンシブ、ガント、モーダル |
-| Nodeサーバー | `server/main.mjs` | API、静的配信、永続化、旧形式移行 |
+| ローカル互換サーバー | `server/main.mjs` | v2互換API、静的配信、旧形式移行 |
 | 初期データ | `server/seed.json` | 新規データ領域の初期値 |
 | 開発ランナー | `scripts/dev.mjs` | ViteとNode APIの同時起動・停止 |
 
@@ -86,18 +85,19 @@ flowchart LR
 sequenceDiagram
   participant U as 利用者
   participant SPA as React SPA
-  participant API as Node API
-  participant DB as release.json
+  participant API as light-api-server v2
+  participant DB as releases.json
   U->>SPA: 作業を選択
-  SPA->>API: GET /api/releases/:id
-  API->>DB: 読み込み・正規化
-  DB-->>API: ReleaseWork
+  SPA->>API: GET /v2/releases/:id
+  API->>DB: ReleaseRecord読み込み
+  DB-->>API: ReleaseRecord
   API-->>SPA: 200 JSON
+  SPA->>SPA: ReleaseRecordをReleaseWorkへ変換
   U->>SPA: 明細を編集して保存
   SPA->>SPA: 楽観的に画面更新
-  SPA->>API: PUT /api/releases/:id
+  SPA->>API: PUT /v2/releases/:id
   API->>DB: 全体を一時ファイル経由で置換
-  API-->>SPA: 保存後のReleaseWork
+  API-->>SPA: 保存後のReleaseRecord
   alt 保存失敗
     SPA->>SPA: 直前の状態へ戻してエラー表示
   end
@@ -219,14 +219,14 @@ erDiagram
 | `category` | string | Yes | 手順書、監視等の分類 |
 | `url` | string | Yes | 遷移先 |
 
-## 6. Node API・永続化設計
+## 6. 共有API・永続化設計
 
 - API詳細は [API仕様書](api-spec.md) を参照する。
-- データファイルは `DATA_DIR/release.json`。
-- データ形状は `{ "releases": ReleaseWork[] }`。
-- 書き込みはPromiseキューに連結し、同一プロセス内で直列化する。
-- `release.json.<pid>.tmp` に書いた後、renameで本ファイルを置換する。
-- 旧形式の単一作業、時刻だけの明細、電話番号・SystemID等の欠損を読み込み時に補完する。
+- データファイルはlight-api-serverの `DATA_DIR/releases.json`。
+- データ形状はトップレベルIDを持つ `ReleaseRecord[]`。
+- 書き込みの直列化と一時ファイル経由のrenameはlight-api-serverが担当する。
+- `src/api.ts`がReleaseRecordと画面用ReleaseWorkを相互変換し、一覧サマリーを計算する。
+- 旧 `release.json` は `npm run migrate:data` でReleaseRecord配列へ変換する。
 
 ## 7. 静的ファイル配信
 
@@ -243,14 +243,14 @@ erDiagram
 | フォーム | 予定・実績の時系列矛盾を保存前に日本語で表示 |
 | APIクライアント | 404は対象なし、それ以外は共有データ処理失敗として表示 |
 | React保存 | 楽観更新を取り消し、直前状態へ戻す |
-| Node API | 400、404、405、500をJSONで返す |
+| 共有API | light-api-server v2が4xx、5xxをJSONで返す |
 | API障害 | 画面上部にエラーバナーを表示し、初期サンプルを利用可能にする |
 
 ## 9. セキュリティ設計
 
 - アプリ内認証は実装しない。外部認証を必須の配置前提とする。
-- 更新者ヘッダーは監査証跡ではなく表示用情報として扱う。
-- CORSは未設定時に付与せず、必要なOriginだけを明示する。
+- `updatedBy`は監査証跡ではなく表示用情報として扱う。
+- 別Origin配置ではlight-api-serverのCORSに必要なSPA Originだけを明示する。
 - iframe埋め込みは同一オリジンだけを許可する。
 - 外部リンクは新規タブ＋opener遮断で開く。
 
@@ -281,7 +281,7 @@ erDiagram
 ## 11. 運用設計
 
 - `/health` をプロセス生存監視に利用する。
-- `DATA_DIR` をバックアップ対象とする。
+- `DATA_DIR/releases.json` をバックアップ対象とする。
 - バックアップ・復元はNodeプロセス停止中、または書き込みがない時間帯に行う。
 - 水平スケールする場合はJSON永続化から共有DBへの移行が必要である。
 - 依存更新時は `npm test` とGitHub Pagesデモを確認する。

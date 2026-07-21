@@ -1,6 +1,6 @@
-{
-  "releases": [
+[
     {
+      "id": 1,
       "release": {
         "id": 1,
         "systemId": "PAYMENT",
@@ -36,5 +36,4 @@
         { "id": 4, "title": "リリースチケット", "description": "変更内容・レビュー履歴", "category": "チケット", "url": "#" }
       ]
     }
-  ]
-}
+]

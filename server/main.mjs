@@ -1,12 +1,13 @@
 import { createServer } from "node:http";
-import { copyFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const distDir = join(projectRoot, "dist");
 const dataDir = resolve(projectRoot, process.env.DATA_DIR || "data");
-const dataFile = join(dataDir, "release.json");
+const dataFile = join(dataDir, "releases.json");
+const legacyDataFile = join(dataDir, "release.json");
 const seedFile = join(projectRoot, "server", "seed.json");
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || "0.0.0.0";
@@ -15,31 +16,49 @@ let writeQueue = Promise.resolve();
 
 const mimeTypes = new Map([[".css", "text/css; charset=utf-8"], [".html", "text/html; charset=utf-8"], [".js", "text/javascript; charset=utf-8"], [".json", "application/json; charset=utf-8"], [".png", "image/png"], [".svg", "image/svg+xml"], [".webp", "image/webp"]]);
 
+function recordsFromValue(value) {
+  const works = Array.isArray(value) ? value : Array.isArray(value?.releases) ? value.releases : value?.release ? [value] : [];
+  return works.map((value, index) => {
+    const record = { ...value, id: Number(value.id || value.release?.id || index + 1) };
+    return normalizeRecord(record);
+  });
+}
+
 async function ensureDataFile() {
   await mkdir(dataDir, { recursive: true });
-  try { await stat(dataFile); } catch { await copyFile(seedFile, dataFile); }
+  try {
+    await stat(dataFile);
+    return;
+  } catch {
+    let source = seedFile;
+    try {
+      await stat(legacyDataFile);
+      source = legacyDataFile;
+    } catch {
+      // Use the bundled seed when no legacy database exists.
+    }
+    const records = recordsFromValue(JSON.parse(await readFile(source, "utf8")));
+    await writeFile(dataFile, `${JSON.stringify(records, null, 2)}\n`, "utf8");
+  }
 }
 
 async function readDatabase() {
   await ensureDataFile();
-  const value = JSON.parse(await readFile(dataFile, "utf8"));
-  if (Array.isArray(value.releases)) return normalizeDatabase(value);
-  if (value.release && Array.isArray(value.timeline)) {
-    value.release.manager ||= value.release.updatedBy || "未設定";
-    return normalizeDatabase({ releases: [value] });
-  }
-  return { releases: [] };
+  return recordsFromValue(JSON.parse(await readFile(dataFile, "utf8")));
 }
 
-function normalizeDatabase(database) {
-  for (const work of database.releases) {
-    work.release.manager ||= work.release.updatedBy || "未設定";
-    work.release.systemId ||= "未設定";
-    work.staffing ||= [];
-    normalizeTimeline(work);
-    normalizeStaffing(work);
-  }
-  return database;
+function normalizeRecord(record) {
+  record.release ||= {};
+  record.release.id = record.id;
+  record.release.manager ||= record.release.updatedBy || "未設定";
+  record.release.systemId ||= "未設定";
+  record.timeline ||= [];
+  record.staffing ||= [];
+  record.approvals ||= [];
+  record.links ||= [];
+  normalizeTimeline(record);
+  normalizeStaffing(record);
+  return record;
 }
 
 function datePart(value) {
@@ -62,8 +81,7 @@ function addDays(value, days) {
 }
 
 function addDateTimeMinutes(value, minutes) {
-  const normalized = String(value).replace(" ", "T");
-  const result = new Date(`${normalized}:00Z`);
+  const result = new Date(`${String(value).replace(" ", "T")}:00Z`);
   result.setUTCMinutes(result.getUTCMinutes() + minutes);
   return result.toISOString().slice(0, 16);
 }
@@ -112,17 +130,17 @@ function normalizeStaffing(work) {
   }
 }
 
-async function writeDatabase(database) {
+async function writeDatabase(records) {
   const temporaryFile = `${dataFile}.${process.pid}.tmp`;
-  await writeFile(temporaryFile, `${JSON.stringify(database, null, 2)}\n`, "utf8");
+  await writeFile(temporaryFile, `${JSON.stringify(records, null, 2)}\n`, "utf8");
   await rename(temporaryFile, dataFile);
 }
 
 function mutateDatabase(mutator) {
   const operation = writeQueue.then(async () => {
-    const database = await readDatabase();
-    const result = await mutator(database);
-    await writeDatabase(database);
+    const records = await readDatabase();
+    const result = await mutator(records);
+    await writeDatabase(records);
     return result;
   });
   writeQueue = operation.then(() => undefined, () => undefined);
@@ -130,40 +148,29 @@ function mutateDatabase(mutator) {
 }
 
 function isReleaseWork(value) {
-  return Boolean(value && typeof value === "object" && value.release && Number.isInteger(value.release.id) && Array.isArray(value.timeline) && Array.isArray(value.staffing) && Array.isArray(value.approvals) && Array.isArray(value.links));
-}
-
-function isCreateInput(value) {
-  return Boolean(value && typeof value === "object" && ["systemId", "name", "version", "releaseDate", "environment", "manager"].every((key) => typeof value[key] === "string" && value[key].trim()));
-}
-
-function summary(work) {
-  const done = work.timeline.filter((item) => item.status === "完了").length;
-  return { ...work.release, progress: work.timeline.length ? Math.round((done / work.timeline.length) * 100) : 0, timelineCount: work.timeline.length, approvalCount: work.approvals.length };
-}
-
-function requestUser(request, fallback = "Release Team") {
-  return String(request.headers["x-auth-request-email"] || request.headers["x-forwarded-user"] || fallback);
+  return Boolean(value && typeof value === "object" && value.release && Array.isArray(value.timeline) && Array.isArray(value.staffing) && Array.isArray(value.approvals) && Array.isArray(value.links));
 }
 
 async function readBody(request) {
   let body = "";
   for await (const chunk of request) {
     body += chunk;
-    if (body.length > 1_000_000) throw new Error("Request body is too large");
+    if (body.length > 1_000_000) throw Object.assign(new Error("Request body is too large"), { statusCode: 413 });
   }
-  return JSON.parse(body || "{}");
+  try {
+    return JSON.parse(body || "{}");
+  } catch {
+    throw Object.assign(new Error("Invalid JSON body"), { statusCode: 400 });
+  }
 }
 
 function setCommonHeaders(response) {
   response.setHeader("x-content-type-options", "nosniff");
   response.setHeader("x-frame-options", "SAMEORIGIN");
   response.setHeader("referrer-policy", "same-origin");
-  if (corsOrigin) {
-    response.setHeader("access-control-allow-origin", corsOrigin);
-    response.setHeader("access-control-allow-methods", "GET, POST, PUT, OPTIONS");
-    response.setHeader("access-control-allow-headers", "content-type");
-  }
+  if (corsOrigin) response.setHeader("access-control-allow-origin", corsOrigin);
+  response.setHeader("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  response.setHeader("access-control-allow-headers", "content-type");
 }
 
 function sendJson(response, statusCode, value) {
@@ -181,69 +188,65 @@ async function serveStatic(pathname, response, method) {
     const body = await readFile(filePath);
     response.writeHead(200, { "content-type": mimeTypes.get(extname(filePath)) || "application/octet-stream", "cache-control": filePath.endsWith("index.html") ? "no-cache" : "public, max-age=31536000, immutable" });
     response.end(method === "HEAD" ? undefined : body);
-  } catch { sendJson(response, 404, { error: "Not found" }); }
+  } catch {
+    sendJson(response, 404, { error: "Not found" });
+  }
 }
 
 const server = createServer(async (request, response) => {
   setCommonHeaders(response);
   const method = request.method || "GET";
   const pathname = new URL(request.url || "/", "http://localhost").pathname;
-  const releaseMatch = pathname.match(/^\/api\/releases\/(\d+)$/);
+  const releaseMatch = pathname.match(/^\/v2\/releases\/(\d+)$/);
 
   try {
-    if (method === "OPTIONS") { response.writeHead(204); response.end(); return; }
-    if (pathname === "/health") { sendJson(response, 200, { status: "ok" }); return; }
-    if (pathname === "/api/releases" && method === "GET") {
-      const database = await readDatabase();
-      sendJson(response, 200, database.releases.map(summary).sort((a, b) => b.id - a.id));
+    if (method === "OPTIONS") { response.writeHead(200); response.end(); return; }
+    if (pathname === "/health") { sendJson(response, 200, { status: "ok", version: 2 }); return; }
+    if (pathname === "/v2/releases" && method === "GET") {
+      sendJson(response, 200, await readDatabase());
       return;
     }
-    if (pathname === "/api/releases" && method === "POST") {
+    if (pathname === "/v2/releases" && method === "POST") {
       const input = await readBody(request);
-      if (!isCreateInput(input)) { sendJson(response, 400, { error: "Invalid release input" }); return; }
-      const created = await mutateDatabase((database) => {
-        const id = database.releases.reduce((largest, work) => Math.max(largest, work.release.id), 0) + 1;
-        const now = new Date().toISOString();
-        const work = { release: { id, systemId: input.systemId.trim(), name: input.name.trim(), version: input.version.trim(), releaseDate: input.releaseDate.trim(), environment: input.environment.trim(), status: "準備中", manager: input.manager.trim(), updatedBy: requestUser(request, input.manager.trim()), updatedAt: now }, timeline: [], staffing: [], approvals: [], links: [] };
-        database.releases.push(work);
-        return work;
+      if (!isReleaseWork(input)) { sendJson(response, 400, { error: "Invalid release data" }); return; }
+      const created = await mutateDatabase((records) => {
+        const id = records.reduce((largest, record) => Math.max(largest, Number(record.id) || 0), 0) + 1;
+        const record = normalizeRecord({ ...input, id });
+        records.push(record);
+        return record;
       });
       sendJson(response, 201, created);
       return;
     }
     if (releaseMatch && method === "GET") {
-      const id = Number(releaseMatch[1]);
-      const work = (await readDatabase()).releases.find((item) => item.release.id === id);
-      sendJson(response, work ? 200 : 404, work || { error: "Release not found" });
+      const record = (await readDatabase()).find((item) => item.id === Number(releaseMatch[1]));
+      sendJson(response, record ? 200 : 404, record || { error: "Resource item not found" });
       return;
     }
     if (releaseMatch && method === "PUT") {
       const id = Number(releaseMatch[1]);
       const input = await readBody(request);
-      if (!isReleaseWork(input) || input.release.id !== id) { sendJson(response, 400, { error: "Invalid release data" }); return; }
-      normalizeDatabase({ releases: [input] });
-      const updated = await mutateDatabase((database) => {
-        const index = database.releases.findIndex((item) => item.release.id === id);
+      if (!isReleaseWork(input) || input.id !== id) { sendJson(response, 400, { error: "Resource id does not match request path" }); return; }
+      const updated = await mutateDatabase((records) => {
+        const index = records.findIndex((item) => item.id === id);
         if (index < 0) return null;
-        input.release.updatedBy = requestUser(request, input.release.updatedBy);
-        input.release.updatedAt = new Date().toISOString();
-        database.releases[index] = input;
-        return input;
+        records[index] = normalizeRecord(input);
+        return records[index];
       });
-      sendJson(response, updated ? 200 : 404, updated || { error: "Release not found" });
+      sendJson(response, updated ? 200 : 404, updated || { error: "Resource item not found" });
       return;
     }
     if (method === "GET" || method === "HEAD") { await serveStatic(pathname, response, method); return; }
     sendJson(response, 405, { error: "Method not allowed" });
   } catch (error) {
-    sendJson(response, 500, { error: error instanceof Error ? error.message : "Internal server error" });
+    sendJson(response, Number(error?.statusCode) || 500, { error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 
 server.listen(port, host, () => {
   const address = server.address();
   const actualPort = typeof address === "object" && address ? address.port : port;
-  console.log(`Release Hub server listening on http://${host}:${actualPort}`);
+  console.log(`Release Hub v2-compatible server listening on http://${host}:${actualPort}`);
 });
 
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => server.close(() => process.exit(0)));

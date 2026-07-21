@@ -13,7 +13,8 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
     "test": "npm run typecheck && npm run build && node --test tests/release-hub.test.mjs",
-    "start": "node server/main.mjs"
+    "start": "node server/main.mjs",
+    "migrate:data": "node scripts/migrate-data.mjs"
   },
   "dependencies": {
     "react": "19.2.6",

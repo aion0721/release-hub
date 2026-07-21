@@ -20,8 +20,9 @@
 ## 構成
 
 - フロントエンド: React + Vite + TypeScript のSPA
-- 共有API: Node.js標準モジュールのみ
-- データ保存: `DATA_DIR/release.json`
+- 共有API: [light-api-server v2](https://github.com/aion0721/light-api-server/tree/v2)（Node.js標準モジュールのみ、依存パッケージ0）
+- APIリソース: `/v2/releases`
+- データ保存: light-api-serverの `DATA_DIR/releases.json`
 - CI: GitLab CIで型検査、テスト、SPAビルド
 
 ## ローカル開発
@@ -33,7 +34,7 @@ npm ci
 npm run dev
 ```
 
-SPAとNode APIが同時に起動します。画面は `http://localhost:5173`、APIは `http://localhost:4174` です。個別に起動する場合は、別々のターミナルで `npm run dev:web` と `npm run dev:api` を使用します。
+SPAとv2互換のローカルAPIが同時に起動します。画面は `http://localhost:5173`、APIは `http://localhost:4174` です。個別に起動する場合は、別々のターミナルで `npm run dev:web` と `npm run dev:api` を使用します。
 
 ## 本番起動
 
@@ -43,7 +44,30 @@ npm run build
 npm start
 ```
 
-既定では `http://0.0.0.0:3000` でSPAとAPIをまとめて配信します。
+既定では `http://0.0.0.0:3000` でSPAとv2互換APIをまとめて配信します。共有環境ではSPAを静的配信し、`VITE_API_BASE_URL`で別ホストのlight-api-serverを指定できます。
+
+### light-api-server設定例
+
+```json
+{
+  "port": 3000,
+  "resources": ["releases"],
+  "cors": {
+    "origin": "https://release-hub.example.jp"
+  },
+  "https": {
+    "enabled": true,
+    "keyFile": "./certs/server.key",
+    "certFile": "./certs/server.crt"
+  }
+}
+```
+
+SPAのビルド時にはAPIサーバのOriginを指定します。
+
+```bash
+VITE_API_BASE_URL=https://api.example.jp npm run build
+```
 
 ## 環境変数
 
@@ -51,12 +75,22 @@ npm start
 | --- | --- | --- |
 | `PORT` | `3000` | 本番サーバーのポート |
 | `HOST` | `0.0.0.0` | Listenアドレス |
-| `DATA_DIR` | `./data` | 共有データの保存先 |
-| `CORS_ORIGIN` | 未設定 | APIを別ドメイン公開する場合の許可Origin |
+| `DATA_DIR` | `./data` | ローカル互換APIの保存先 |
+| `CORS_ORIGIN` | 未設定 | ローカル互換APIを別ドメイン公開する場合の許可Origin |
 | `VITE_API_BASE_URL` | 未設定 | APIをSPAと別ドメインへ置く場合のURL |
 | `VITE_BASE_PATH` | `/` | サブパス配信時のベースパス |
 
-`DATA_DIR` は永続ボリュームへ割り当ててください。認証は社内のリバースプロキシまたはSSOで行い、認証済みメールを `x-auth-request-email` に渡すと最終更新者へ記録されます。
+`VITE_API_BASE_URL`は末尾のスラッシュなしで指定します。GitHub PagesなどHTTPSのSPAから接続するAPIもHTTPSにし、light-api-server側のCORSでSPAのOriginを許可してください。
+
+### 既存データの移行
+
+旧 `DATA_DIR/release.json` は、light-api-serverを初めて起動する前に次のコマンドで汎用レコード配列へ変換します。既存の `releases.json` は上書きしません。
+
+```bash
+DATA_DIR=./data npm run migrate:data
+```
+
+移行後の `releases.json` をlight-api-serverの `DATA_DIR`へ配置してください。
 
 ## GitLab
 
@@ -64,7 +98,7 @@ npm start
 
 ## GitHub Pagesデモ
 
-`.github/workflows/pages.yml` は `main` 更新時にテストとビルドを実行し、GitHub Pagesへデモ版を公開します。デモ版はサンプルデータを使用し、変更はブラウザを再読み込みするまでの一時的なものです。共有データを永続化する本番運用では、引き続きNode APIと `DATA_DIR` を使用してください。
+`.github/workflows/pages.yml` は `main` 更新時にテストとビルドを実行し、GitHub Pagesへデモ版を公開します。デモ版はサンプルデータを使用し、変更はブラウザを再読み込みするまでの一時的なものです。共有データを永続化する本番運用では、light-api-serverと永続化した `DATA_DIR` を使用してください。
 
 ## コンテナ
 
