@@ -120,6 +120,8 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(app, /list="system-filter-options"/);
   assert.match(app, /list="project-filter-options"/);
   assert.match(app, /onOpenPreview\(\{ type: "timeline", item \}\)/);
+  assert.match(app, /className="gantt-action-header">操作/);
+  assert.match(app, /className="gantt-action-cell"/);
   assert.match(app, /content: String\(values\.content/);
   const detailHeaderSource = app.slice(app.indexOf('function WorkDetail'), app.indexOf('<div id="overview"'));
   assert.match(detailHeaderSource, /loading \? "更新中" : "更新"/);
@@ -147,6 +149,8 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(html, /Release Hub \| リリース情報をひとつに/);
   assert.match(styles, /\.gantt-corner \{ position:sticky; top:0/);
   assert.match(styles, /\.gantt-axis \{ min-height:48px; position:sticky; top:0/);
+  assert.match(styles, /\.gantt-label \{ min-height:56px; position:sticky; left:0/);
+  assert.match(styles, /\.gantt-action-cell \{ min-height:56px; position:sticky; left:var\(--gantt-label-width\)/);
 });
 
 test("partial release updates preserve timeline and other detail arrays", async (context) => {
