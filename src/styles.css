@@ -108,9 +108,20 @@ button.nav-item { width:100%; border:0; background:transparent; text-align:left;
 .staffing-compact-row { width:100%; min-height:62px; display:grid; grid-template-columns:32px minmax(120px,.7fr) minmax(220px,1.3fr) 14px; align-items:center; gap:10px; padding:8px 0; border:0; border-bottom:1px solid #edf1f5; background:transparent; text-align:left; cursor:pointer; }
 .staffing-compact-row:last-child { border-bottom:0; }
 .staffing-compact-row:hover strong { color:#315f9b; }
+.staffing-compact-row.mode-現地 { box-shadow:inset 3px 0 #159a6e; }
+.staffing-compact-row.mode-リモート { box-shadow:inset 3px 0 #397dcc; }
+.staffing-compact-row.mode-オンコール { box-shadow:inset 3px 0 #8054bd; }
+.staffing-compact-row.mode-その他 { box-shadow:inset 3px 0 #7c8795; }
 .staffing-person,.staffing-time { min-width:0; display:grid; gap:3px; }
 .staffing-person strong,.staffing-time strong { overflow:hidden; color:#283b53; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
 .staffing-person small,.staffing-time small { overflow:hidden; color:#8794a5; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+.staffing-name-line { min-width:0; display:flex; align-items:center; gap:6px; }
+.staffing-name-line>strong { min-width:0; }
+.staffing-mode-badge { flex:0 0 auto; display:inline-flex; align-items:center; gap:3px; padding:2px 6px; border-radius:999px; font-size:8px; font-weight:900; line-height:1.25; white-space:nowrap; }
+.staffing-mode-badge.mode-現地 { color:#087454; background:#e2f6ed; }
+.staffing-mode-badge.mode-リモート { color:#215f9f; background:#e5f0fc; }
+.staffing-mode-badge.mode-オンコール { color:#67409a; background:#efe8f9; }
+.staffing-mode-badge.mode-その他 { color:#596574; background:#edf0f3; }
 .timeline-row { width:100%; display:grid; grid-template-columns:18px 76px 36px minmax(0,1fr) 88px; align-items:center; min-height:72px; padding:0; background:none; border:0; border-bottom:1px solid #eff2f5; text-align:left; cursor:grab; }
 .timeline-row:focus-visible { outline:2px solid #79a9e8; outline-offset:-2px; }
 .timeline-row:active { cursor:grabbing; }
@@ -355,6 +366,10 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .gantt-bar:hover { filter:brightness(.94); }
 .gantt-bar.disabled { cursor:wait; opacity:.65; }
 .staffing-gantt-bar { position:absolute; top:9px; height:38px; overflow:hidden; border-radius:6px; color:#fff; background:linear-gradient(100deg,#6342a6,#8463c3); touch-action:none; user-select:none; box-shadow:0 3px 8px #3b236b26; }
+.staffing-gantt-bar.mode-現地 { background:linear-gradient(100deg,#087d5a,#19a779); }
+.staffing-gantt-bar.mode-リモート { background:linear-gradient(100deg,#2868ad,#4b8dd2); }
+.staffing-gantt-bar.mode-オンコール { background:linear-gradient(100deg,#6342a6,#8463c3); }
+.staffing-gantt-bar.mode-その他 { background:linear-gradient(100deg,#5e6977,#808b98); }
 .staffing-gantt-bar.dragging { z-index:3; filter:brightness(1.06); }
 .staffing-gantt-content { width:100%; height:100%; display:grid; align-content:center; gap:1px; padding:0 11px; border:0; color:inherit; background:transparent; text-align:left; cursor:grab; touch-action:none; }
 .staffing-gantt-content:active { cursor:grabbing; }
@@ -468,6 +483,20 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .category-edit-row .primary-button { margin:0; padding:9px 11px; }
 .empty-state.compact { min-height:220px; }
 .preview-status { align-items:center; gap:8px; }
+.staffing-mode-fieldset { margin:0; padding:0; border:0; }
+.staffing-mode-fieldset legend { margin-bottom:7px; color:#4b5c72; font-size:10px; font-weight:800; }
+.staffing-mode-options { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; }
+.staffing-mode-option { cursor:pointer; }
+.staffing-mode-option input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+.staffing-mode-option span { min-height:58px; display:grid; place-items:center; align-content:center; gap:4px; border:1px solid #d7dee8; border-radius:8px; color:#5d6d80; background:#fff; transition:border-color .15s,background .15s,box-shadow .15s; }
+.staffing-mode-option span b { font-size:16px; line-height:1; }
+.staffing-mode-option span strong { font-size:10px; }
+.staffing-mode-option:hover span { border-color:#a9bbd0; background:#f7f9fc; }
+.staffing-mode-option input:focus-visible+span { outline:2px solid #4c8fd8; outline-offset:2px; }
+.staffing-mode-option.mode-現地 input:checked+span { border-color:#3cab87; color:#087454; background:#e8f8f0; box-shadow:inset 0 0 0 1px #3cab87; }
+.staffing-mode-option.mode-リモート input:checked+span { border-color:#568fd0; color:#215f9f; background:#eaf3fd; box-shadow:inset 0 0 0 1px #568fd0; }
+.staffing-mode-option.mode-オンコール input:checked+span { border-color:#8b68bd; color:#67409a; background:#f2ecfa; box-shadow:inset 0 0 0 1px #8b68bd; }
+.staffing-mode-option.mode-その他 input:checked+span { border-color:#8995a3; color:#596574; background:#f0f2f4; box-shadow:inset 0 0 0 1px #8995a3; }
 @media(max-width:1050px) {
   .app-shell { grid-template-columns:74px minmax(0,1fr); }
   .sidebar { width:74px; padding:25px 12px; }
@@ -482,6 +511,7 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
   .side-note,.user-chip div { display:none; }
   .user-chip { justify-content:center; padding:13px 0 0; }
   .content { grid-column:2; padding:28px; }
+  .staffing-mode-options { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .link-grid { grid-template-columns:repeat(2,1fr); }
   .summary-grid { grid-template-columns:repeat(2,1fr); }
   .list-hero { grid-template-columns:160px 150px 1fr; }

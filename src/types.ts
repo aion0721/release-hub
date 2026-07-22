@@ -2,6 +2,7 @@ export type TimelineStatus = "未着手" | "進行中" | "完了";
 export type TimelinePlan = "本線" | "コンチプラン";
 export type TimelineKind = "作業" | "申請物";
 export type ApprovalStatus = "未申請" | "申請中" | "回付済" | "結了済";
+export type StaffingMode = "現地" | "リモート" | "オンコール" | "その他";
 
 export type TimelineItem = {
   id: number;
@@ -52,6 +53,7 @@ export type StaffingAssignment = {
   phone: string;
   startAt: string;
   endAt: string;
+  workMode: StaffingMode;
   location: string;
   note: string;
 };

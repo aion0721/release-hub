@@ -73,7 +73,7 @@ test("SPA contains editable release-operation controls", async () => {
     readFile(new URL("../index.html", import.meta.url), "utf8"),
     readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
   ]);
-  for (const label of ["タイムチャート", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "一覧を更新", "作業一覧へ戻る", "この作業", "共有URLをコピー", "URLをコピーしました", "作業をコピー", "コピーを作成", "明細をコピー", "プロジェクト番号（任意）", "プロジェクト番号未設定", "作業をグループ化", "グループなし", "SystemIDを入力または候補から絞り込み", "プロジェクト番号を入力または候補から絞り込み", "作業状態で絞り込み", "未完了", "作業を削除", "この操作は取り消せません", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "＋ 体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "作業タイトル", "内容（任意）", "紐づける申請物（任意）", "紐づける手順書・関連リンク（任意）", "申請物一覧へ申請", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "明細を表示", "申請物一覧", "申請物を編集", "未申請", "申請中", "回付済", "結了済", "申請リンク（任意）", "手順書・関連リンク", "リンク情報を編集", "URL（任意）", "情報を編集", "リンク未登録", "備考（任意）", "この明細を削除", "そのまま開く", "クリップボードからペースト", "URLエンコード", "当日作業の開始から8時間", "当日体制から選択または入力", "種別", "入力内容を保存できません", "▶ 開始", "✓ 完了", "申請種別管理", "申請種別を追加", "認証・権限制御なし", "自由入力対応", "申請種別（任意）", "候補から選択または手入力"]) {
+  for (const label of ["タイムチャート", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "一覧を更新", "作業一覧へ戻る", "この作業", "共有URLをコピー", "URLをコピーしました", "作業をコピー", "コピーを作成", "明細をコピー", "プロジェクト番号（任意）", "プロジェクト番号未設定", "作業をグループ化", "グループなし", "SystemIDを入力または候補から絞り込み", "プロジェクト番号を入力または候補から絞り込み", "作業状態で絞り込み", "未完了", "作業を削除", "この操作は取り消せません", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "＋ 体制", "対応開始日時", "電話番号", "対応形態", "現地", "リモート", "オンコール", "その他", "場所・拠点・補足（任意）", "開始日時", "作業情報を編集", "作業タイトル", "内容（任意）", "紐づける申請物（任意）", "紐づける手順書・関連リンク（任意）", "申請物一覧へ申請", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "明細を表示", "申請物一覧", "申請物を編集", "未申請", "申請中", "回付済", "結了済", "申請リンク（任意）", "手順書・関連リンク", "リンク情報を編集", "URL（任意）", "情報を編集", "リンク未登録", "備考（任意）", "この明細を削除", "そのまま開く", "クリップボードからペースト", "URLエンコード", "当日作業の開始から8時間", "当日体制から選択または入力", "種別", "入力内容を保存できません", "▶ 開始", "✓ 完了", "申請種別管理", "申請種別を追加", "認証・権限制御なし", "自由入力対応", "申請種別（任意）", "候補から選択または手入力"]) {
     assert.match(app, new RegExp(label));
   }
   assert.match(app, /PreviewModal/);
@@ -113,6 +113,9 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(app, /item\.kind \|\| "作業"/);
   assert.match(app, /toMinutes\(staffingStartAt\) \+ 8 \* 60/);
   assert.match(app, /list="staffing-owner-options"/);
+  assert.match(app, /name="workMode"/);
+  assert.match(app, /normalizeStaffingMode/);
+  assert.match(app, /staffing-mode-badge/);
   assert.match(app, /role="alert"/);
   assert.match(app, /updateTimelineStatus/);
   assert.match(app, /name="approvalId"/);
@@ -151,6 +154,10 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(styles, /\.gantt-axis \{ min-height:48px; position:sticky; top:0/);
   assert.match(styles, /\.gantt-label \{ min-height:56px; position:sticky; left:0/);
   assert.match(styles, /\.gantt-action-cell \{ min-height:56px; position:sticky; left:var\(--gantt-label-width\)/);
+  for (const mode of ["現地", "リモート", "オンコール", "その他"]) {
+    assert.match(styles, new RegExp(`\\.staffing-gantt-bar\\.mode-${mode}`));
+    assert.match(styles, new RegExp(`\\.staffing-mode-option\\.mode-${mode}`));
+  }
 });
 
 test("partial release updates preserve timeline and other detail arrays", async (context) => {
@@ -234,6 +241,7 @@ test("v2-compatible local API migrates legacy time-only details across midnight"
   assert.equal(saved.staffing[0].startAt, "2026-08-01T21:00");
   assert.equal(saved.staffing[0].endAt, "2026-08-02T01:00");
   assert.equal(saved.staffing[0].phone, "");
+  assert.equal(saved.staffing[0].workMode, "現地");
   assert.equal(saved.release.systemId, "未設定");
   assert.equal(saved.timeline[0].actualStartAt, "");
   assert.equal(saved.timeline[0].actualEndAt, "");
@@ -261,7 +269,7 @@ test("v2-compatible local API persists release records and work edits", async (c
     { id: 1, startAt: "2026-08-01T22:00", endAt: "2026-08-01T22:30", actualStartAt: "2026-08-01T22:05", actualEndAt: "2026-08-01T22:42", title: "本番デプロイ", owner: "山田", status: "完了", plan: "本線", kind: "作業", resourceLinkId: 1 },
     { id: 2, startAt: "2026-08-01T22:30", endAt: "2026-08-01T23:00", title: "切り戻し判定", content: "申請の回付状態を確認", owner: "佐藤", status: "未着手", plan: "コンチプラン", kind: "申請物", approvalId: 1 },
   ];
-  created.staffing = [{ id: 1, name: "佐藤", phone: "090-1111-2222", startAt: "2026-08-01T21:00", endAt: "2026-08-02T01:00", location: "オンコール", note: "一次連絡先" }];
+  created.staffing = [{ id: 1, name: "佐藤", phone: "090-1111-2222", startAt: "2026-08-01T21:00", endAt: "2026-08-02T01:00", workMode: "オンコール", location: "オンコール", note: "一次連絡先" }];
   created.approvals = [{ id: 1, title: "本番変更申請", owner: "佐藤", due: "2026-08-01", status: "申請中", url: "" }];
   created.links = [{ id: 1, title: "本番手順書", category: "手順書", description: "初版", url: "" }];
   let saved = (await saveRelease(baseUrl, created)).body;
@@ -293,6 +301,7 @@ test("v2-compatible local API persists release records and work edits", async (c
   assert.equal(reloaded.body.timeline[1].actualEndAt, "2026-08-01T22:42");
   assert.equal(reloaded.body.timeline[1].resourceLinkId, 1);
   assert.equal(reloaded.body.staffing[0].phone, "090-3333-4444");
+  assert.equal(reloaded.body.staffing[0].workMode, "オンコール");
   assert.equal(reloaded.body.approvals[0].title, "本番変更申請（更新）");
   assert.equal(reloaded.body.approvals[0].status, "結了済");
   assert.equal(reloaded.body.links[0].description, "改訂版");

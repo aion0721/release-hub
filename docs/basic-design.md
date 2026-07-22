@@ -213,7 +213,8 @@ erDiagram
 | `phone` | string | No | 電話番号 |
 | `startAt` | string | Yes | 対応開始日時 |
 | `endAt` | string | Yes | 対応終了日時 |
-| `location` | string | Yes | 場所・待機形態 |
+| `workMode` | enum | Yes | 現地／リモート／オンコール／その他。旧データはlocationから補完 |
+| `location` | string | No | 場所・拠点・補足。未設定時はworkModeで補完 |
 | `note` | string | No | 役割・補足 |
 
 ### 5.5 ApprovalItem

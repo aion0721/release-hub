@@ -92,6 +92,7 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
 - `release.projectNumber`は任意で、未設定時は空文字を保存する。旧`release.version`はSPAとローカル互換APIがprojectNumberへ移行し、versionは削除する。
 - `timeline.kind`は「作業」または「申請物」。旧データで未設定の場合はSPAとローカル互換APIが「作業」として扱う。
 - `timeline.title`は作業タイトル、`timeline.content`は任意入力の内容で、旧データのcontent未設定は空文字として扱う。
+- `staffing[].workMode`は現地／リモート／オンコール／その他。未設定時はlocationにオンコールを含めばオンコール、リモートまたは在宅を含めばリモート、それ以外は現地として正規化する。locationが空の場合はworkModeを補完する。
 - `timeline.approvalId`はkindが「申請物」の場合だけ保持する任意の申請物IDで、未選択またはkindが「作業」の場合は省略する。
 - `timeline.resourceLinkId`はkindが「作業」の場合だけ保持する任意の手順書・関連リンクIDで、未選択またはkindが「申請物」の場合は省略する。
 - 申請リンクと関連リンクのURLは任意で、未登録時は空文字を保存する。

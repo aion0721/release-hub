@@ -153,6 +153,11 @@ function normalizeTimeline(work) {
 function normalizeStaffing(work) {
   for (const assignment of work.staffing) {
     assignment.phone ||= "";
+    const location = String(assignment.location || "");
+    if (!["現地", "リモート", "オンコール", "その他"].includes(assignment.workMode)) {
+      assignment.workMode = /オンコール/i.test(location) ? "オンコール" : /リモート|在宅/i.test(location) ? "リモート" : "現地";
+    }
+    assignment.location ||= assignment.workMode;
     if (!assignment.startAt) assignment.startAt = `${datePart(work.release.releaseDate)}T${timePart(assignment.startTime)}`;
     else assignment.startAt = String(assignment.startAt).replace(" ", "T");
     if (!assignment.endAt) {
