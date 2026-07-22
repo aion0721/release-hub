@@ -109,7 +109,7 @@ export default function App() {
   demoWorksRef.current = demoWorks;
   const [selected, setSelected] = useState<ReleaseWork | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
-  const [approvalCategories, setApprovalCategories] = useState<Category[]>(sampleApprovalCategories);
+  const [approvalCategories, setApprovalCategories] = useState<Category[]>(demoMode ? sampleApprovalCategories : []);
   const [categorySaving, setCategorySaving] = useState(false);
   const [categoryError, setCategoryError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -140,7 +140,10 @@ export default function App() {
 
   useEffect(() => {
     void loadSummaries();
-    if (!demoMode) void fetchCategories("approval").then((categories) => { setApprovalCategories(categories); setCategoryError(""); }).catch((reason) => setCategoryError(reason instanceof Error ? reason.message : "申請種別を読み込めませんでした"));
+    if (!demoMode) void fetchCategories("approval").then((categories) => { setApprovalCategories(categories); setCategoryError(""); }).catch((reason) => {
+      setApprovalCategories([]);
+      setCategoryError(reason instanceof Error ? reason.message : "申請種別を読み込めませんでした");
+    });
   }, [loadSummaries]);
 
   useEffect(() => {

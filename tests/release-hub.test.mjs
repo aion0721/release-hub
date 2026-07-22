@@ -112,6 +112,8 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(apiClient, /method: "DELETE"/);
   assert.match(apiClient, /\/v2\/categories/);
   assert.match(apiClient, /category\.scope === scope/);
+  assert.match(apiClient, /APIサーバーのresourcesにcategoriesを追加してください/);
+  assert.doesNotMatch(apiClient, /JSON\.stringify\(\{ \.\.\.input, id: 0 \}\)/);
   assert.match(html, /Release Hub \| リリース情報をひとつに/);
 });
 
@@ -244,7 +246,7 @@ test("v2-compatible local API manages scoped categories", async (context) => {
   const created = await requestJson(`${baseUrl}/v2/categories`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ id: 0, scope: "resource-link", name: "監視", description: "監視ツール" }),
+    body: JSON.stringify({ scope: "resource-link", name: "監視", description: "監視ツール" }),
   });
   assert.equal(created.response.status, 201);
   assert.equal(created.body.id, 3);

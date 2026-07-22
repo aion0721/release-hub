@@ -5,13 +5,20 @@ const apiBase = configuredBase.replace(/\/$/, "");
 const releasesPath = "/v2/releases";
 const categoriesPath = "/v2/categories";
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+type RequestErrorMessages = {
+  notFound?: string;
+  failed?: string;
+};
+
+async function request<T>(path: string, init?: RequestInit, messages: RequestErrorMessages = {}): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
     headers: { accept: "application/json", ...init?.headers },
     ...init,
   });
   if (!response.ok) {
-    const message = response.status === 404 ? "対象の作業が見つかりません" : "共有データを処理できませんでした";
+    const message = response.status === 404
+      ? messages.notFound || "対象のデータが見つかりません"
+      : messages.failed || "共有データを処理できませんでした";
     throw new Error(message);
   }
   return response.json() as Promise<T>;
@@ -50,7 +57,9 @@ export async function fetchReleaseSummaries() {
 }
 
 export async function fetchReleaseWork(id: number) {
-  return workFromRecord(await request<ReleaseRecord>(`${releasesPath}/${id}`));
+  return workFromRecord(await request<ReleaseRecord>(`${releasesPath}/${id}`, undefined, {
+    notFound: "対象の作業が見つかりません",
+  }));
 }
 
 export async function createReleaseWork(input: CreateReleaseInput) {
@@ -90,16 +99,20 @@ export async function saveReleaseWork(work: ReleaseWork) {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(recordFromWork(work)),
-  });
+  }, { notFound: "対象の作業が見つかりません" });
   return workFromRecord(saved);
 }
 
 export async function deleteReleaseWork(id: number) {
-  await request<ReleaseRecord>(`${releasesPath}/${id}`, { method: "DELETE" });
+  await request<ReleaseRecord>(`${releasesPath}/${id}`, { method: "DELETE" }, {
+    notFound: "対象の作業が見つかりません",
+  });
 }
 
 export async function fetchCategories(scope?: string) {
-  const categories = await request<Category[]>(categoriesPath);
+  const categories = await request<Category[]>(categoriesPath, undefined, {
+    notFound: "カテゴリAPIが利用できません。APIサーバーのresourcesにcategoriesを追加してください",
+  });
   return scope ? categories.filter((category) => category.scope === scope) : categories;
 }
 
@@ -107,7 +120,7 @@ export async function createCategory(input: Omit<Category, "id">) {
   return request<Category>(categoriesPath, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...input, id: 0 }),
+    body: JSON.stringify(input),
   });
 }
 
@@ -116,9 +129,11 @@ export async function saveCategory(category: Category) {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(category),
-  });
+  }, { notFound: "対象のカテゴリが見つかりません。一覧を更新してください" });
 }
 
 export async function deleteCategory(id: number) {
-  await request<Category>(`${categoriesPath}/${id}`, { method: "DELETE" });
+  await request<Category>(`${categoriesPath}/${id}`, { method: "DELETE" }, {
+    notFound: "対象のカテゴリが見つかりません。一覧を更新してください",
+  });
 }

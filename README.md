@@ -53,7 +53,7 @@ npm start
 ```json
 {
   "port": 3000,
-  "resources": ["releases"],
+  "resources": ["releases", "categories"],
   "cors": {
     "origin": "https://release-hub.example.jp"
   },
