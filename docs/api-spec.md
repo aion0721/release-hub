@@ -94,6 +94,7 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
 - `timeline.title`は作業タイトル、`timeline.content`は任意入力の内容で、旧データのcontent未設定は空文字として扱う。
 - `timeline.approvalId`はkindが「申請物」の場合だけ保持する任意の申請物IDで、未選択またはkindが「作業」の場合は省略する。
 - 申請リンクと関連リンクのURLは任意で、未登録時は空文字を保存する。
+- `approvals[].note`と`links[].note`は任意の備考で、旧データの未設定時は空文字として扱う。
 - 申請状態は未申請／申請中／回付済／結了済。旧「承認済み」はSPAで「結了済」へ読み替える。
 
 ## 5. エンドポイント一覧

@@ -85,6 +85,8 @@ function normalizeRecord(record) {
   record.staffing ||= [];
   record.approvals ||= [];
   record.links ||= [];
+  record.approvals = record.approvals.map((item) => ({ ...item, note: String(item.note || "") }));
+  record.links = record.links.map((item) => ({ ...item, note: String(item.note || "") }));
   normalizeTimeline(record);
   normalizeStaffing(record);
   return record;

@@ -72,7 +72,7 @@ test("SPA contains editable release-operation controls", async () => {
     readFile(new URL("../src/api.ts", import.meta.url), "utf8"),
     readFile(new URL("../index.html", import.meta.url), "utf8"),
   ]);
-  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "一覧を更新", "作業一覧へ戻る", "この作業", "共有URLをコピー", "URLをコピーしました", "作業をコピー", "コピーを作成", "明細をコピー", "プロジェクト番号（任意）", "プロジェクト番号未設定", "作業をグループ化", "グループなし", "SystemIDで絞り込み", "作業状態で絞り込み", "未完了", "作業を削除", "この操作は取り消せません", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "＋ 体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "作業タイトル", "内容（任意）", "紐づける申請物（任意）", "申請物一覧へ申請", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "未申請", "申請中", "回付済", "結了済", "申請リンク（任意）", "手順書・関連リンク", "リンク情報を編集", "URL（任意）", "情報を編集", "リンクを開く", "リンク未登録", "当日作業の開始から8時間", "当日体制から選択または入力", "種別", "入力内容を保存できません", "▶ 開始", "✓ 完了", "申請種別管理", "申請種別を追加", "認証・権限制御なし", "自由入力対応", "申請種別（任意）", "候補から選択または手入力"]) {
+  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "一覧を更新", "作業一覧へ戻る", "この作業", "共有URLをコピー", "URLをコピーしました", "作業をコピー", "コピーを作成", "明細をコピー", "プロジェクト番号（任意）", "プロジェクト番号未設定", "作業をグループ化", "グループなし", "SystemIDで絞り込み", "作業状態で絞り込み", "未完了", "作業を削除", "この操作は取り消せません", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "＋ 体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "作業タイトル", "内容（任意）", "紐づける申請物（任意）", "申請物一覧へ申請", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "未申請", "申請中", "回付済", "結了済", "申請リンク（任意）", "手順書・関連リンク", "リンク情報を編集", "URL（任意）", "情報を編集", "リンク未登録", "備考（任意）", "この明細を削除", "そのまま開く", "クリップボードからペースト", "URLエンコード", "当日作業の開始から8時間", "当日体制から選択または入力", "種別", "入力内容を保存できません", "▶ 開始", "✓ 完了", "申請種別管理", "申請種別を追加", "認証・権限制御なし", "自由入力対応", "申請種別（任意）", "候補から選択または手入力"]) {
     assert.match(app, new RegExp(label));
   }
   assert.match(app, /PreviewModal/);
@@ -99,6 +99,12 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(app, /addEventListener\("popstate"/);
   assert.match(app, /demoWorksRef\.current\.find/);
   assert.match(app, /navigator\.clipboard\.writeText/);
+  assert.match(app, /navigator\.clipboard\?\.readText/);
+  assert.match(app, /encodeURI\(decodeURI\(input\.value\)\)/);
+  assert.match(app, /useState<"list" \| "gantt">\("gantt"\)/);
+  assert.match(app, /function deleteDetail/);
+  assert.match(app, /function updateApprovalStatus/);
+  assert.match(app, /onOpenApproval/);
   assert.match(app, /buildReleaseCopy/);
   assert.match(app, /const minuteDelta =/);
   assert.match(app, /actualStartAt: "", actualEndAt: "", status: "未着手"/);
@@ -154,6 +160,7 @@ test("partial release updates preserve timeline and other detail arrays", async 
   const reloaded = await requestJson(`${baseUrl}/v2/releases/${saved.id}`);
   assert.equal(reloaded.body.timeline.length, 1);
   assert.equal(reloaded.body.approvals.length, 1);
+  assert.equal(reloaded.body.approvals[0].note, "");
 });
 
 test("GitHub Pages workflow builds the demo with required deployment settings", async () => {

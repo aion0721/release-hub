@@ -25,15 +25,15 @@
         { "id": 2, "name": "田中", "phone": "080-1234-5678", "startAt": "2026-07-24T21:00", "endAt": "2026-07-25T01:00", "location": "オンコール", "note": "一次連絡先" }
       ],
       "approvals": [
-        { "id": 1, "title": "本番変更申請", "category": "WF", "owner": "田中", "due": "2026-07-22", "status": "結了済", "url": "#" },
-        { "id": 2, "title": "メンテナンス告知", "category": "資源配布", "owner": "佐藤", "due": "2026-07-23", "status": "回付済", "url": "#" },
-        { "id": 3, "title": "リリース判定票", "owner": "鈴木", "due": "2026-07-24", "status": "未申請", "url": "" }
+        { "id": 1, "title": "本番変更申請", "category": "WF", "owner": "田中", "due": "2026-07-22", "status": "結了済", "url": "#", "note": "CAB承認済み" },
+        { "id": 2, "title": "メンテナンス告知", "category": "資源配布", "owner": "佐藤", "due": "2026-07-23", "status": "回付済", "url": "#", "note": "掲載内容を運用チーム確認中" },
+        { "id": 3, "title": "リリース判定票", "owner": "鈴木", "due": "2026-07-24", "status": "未申請", "url": "", "note": "" }
       ],
       "links": [
-        { "id": 1, "title": "本番リリース手順書", "description": "デプロイから確認までの標準手順", "category": "手順書", "url": "#" },
-        { "id": 2, "title": "切り戻し手順", "description": "障害発生時の復旧フロー", "category": "緊急時", "url": "#" },
-        { "id": 3, "title": "監視ダッシュボード", "description": "メトリクスとログを確認", "category": "監視", "url": "#" },
-        { "id": 4, "title": "リリースチケット", "description": "変更内容・レビュー履歴", "category": "チケット", "url": "#" }
+        { "id": 1, "title": "本番リリース手順書", "description": "デプロイから確認までの標準手順", "category": "手順書", "url": "#", "note": "当日は最新版を利用" },
+        { "id": 2, "title": "切り戻し手順", "description": "障害発生時の復旧フロー", "category": "緊急時", "url": "#", "note": "" },
+        { "id": 3, "title": "監視ダッシュボード", "description": "メトリクスとログを確認", "category": "監視", "url": "#", "note": "本番テナントを選択" },
+        { "id": 4, "title": "リリースチケット", "description": "変更内容・レビュー履歴", "category": "チケット", "url": "#", "note": "" }
       ]
     }
 ]

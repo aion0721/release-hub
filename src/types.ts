@@ -26,6 +26,7 @@ export type ApprovalItem = {
   due: string;
   status: ApprovalStatus;
   url: string;
+  note: string;
 };
 
 export type Category = {
@@ -41,6 +42,7 @@ export type ResourceLink = {
   description: string;
   category: string;
   url: string;
+  note: string;
 };
 
 export type StaffingAssignment = {

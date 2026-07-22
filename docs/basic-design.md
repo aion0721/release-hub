@@ -152,6 +152,8 @@ sequenceDiagram
 - 背景クリックまたは閉じるボタンで閉じる。
 - 新規追加と編集は同じモーダルを使用し、`editTarget` の有無で切り替える。
 - 申請物とリンクは、一覧クリック時にまず詳細モーダルを開く。
+- 編集・詳細モーダルは個別明細の削除確認モーダルを開ける。
+- URL入力はClipboard APIの読み取りと`encodeURI`によるエンコードを補助操作として提供する。
 
 ## 5. データ設計
 
@@ -221,6 +223,7 @@ erDiagram
 | `due` | string | Yes | 期限（`YYYY-MM-DD`） |
 | `status` | enum | Yes | 未申請／申請中／回付済／結了済 |
 | `url` | string | No | 申請先リンク。未登録は空文字 |
+| `note` | string | No | 備考。未登録は空文字 |
 
 ### 5.6 Category
 
@@ -240,6 +243,7 @@ erDiagram
 | `description` | string | Yes | 説明 |
 | `category` | string | Yes | 手順書、監視等の分類 |
 | `url` | string | No | 遷移先。未登録は空文字 |
+| `note` | string | No | 備考。未登録は空文字 |
 
 ## 6. 共有API・永続化設計
 
