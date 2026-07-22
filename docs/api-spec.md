@@ -68,7 +68,7 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
     "id": 1,
     "systemId": "PAYMENT",
     "name": "決済基盤アップデート",
-    "version": "v2.8.0",
+    "projectNumber": "PJ-2026-024",
     "releaseDate": "2026-07-24 22:00",
     "environment": "Production",
     "status": "準備中",
@@ -89,7 +89,7 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
 - 一覧用の進捗、作業件数、申請件数はSPAがReleaseRecordから計算する。
 - `updatedAt`はSPAが保存操作時に更新する。
 - `updatedBy`は新規登録時に責任者を初期値とする。利用者識別が必要な場合は認証基盤側で別途設計する。
-- `release.version`は任意で、未設定時は空文字を保存する。
+- `release.projectNumber`は任意で、未設定時は空文字を保存する。旧`release.version`はSPAとローカル互換APIがprojectNumberへ移行し、versionは削除する。
 - `timeline.kind`は「作業」または「申請物」。旧データで未設定の場合はSPAとローカル互換APIが「作業」として扱う。
 - `timeline.title`は作業タイトル、`timeline.content`は任意入力の内容で、旧データのcontent未設定は空文字として扱う。
 - `timeline.approvalId`はkindが「申請物」の場合だけ保持する任意の申請物IDで、未選択またはkindが「作業」の場合は省略する。
@@ -142,7 +142,7 @@ SPAは入力値から空の明細配列を持つReleaseWorkを組み立てて送
     "id": 0,
     "systemId": "MEMBER",
     "name": "会員基盤リリース",
-    "version": "v1.3.0",
+    "projectNumber": "PJ-MEMBER-001",
     "releaseDate": "2026-08-01 22:00",
     "environment": "Production",
     "status": "準備中",

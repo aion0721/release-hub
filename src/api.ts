@@ -26,9 +26,11 @@ async function request<T>(path: string, init?: RequestInit, messages: RequestErr
 
 function workFromRecord(record: ReleaseRecord): ReleaseWork {
   const { id, ...work } = record;
+  const legacyRelease = work.release as ReleaseWork["release"] & { version?: string };
+  const { version, ...release } = legacyRelease;
   return {
     ...work,
-    release: { ...work.release, id },
+    release: { ...release, id, projectNumber: release.projectNumber || version || "" },
     timeline: work.timeline ?? [],
     staffing: work.staffing ?? [],
     approvals: work.approvals ?? [],
@@ -69,7 +71,7 @@ export async function createReleaseWork(input: CreateReleaseInput) {
       id: 0,
       systemId: input.systemId.trim(),
       name: input.name.trim(),
-      version: input.version.trim(),
+      projectNumber: input.projectNumber.trim(),
       releaseDate: input.releaseDate.trim(),
       environment: input.environment.trim(),
       status: "準備中",

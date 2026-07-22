@@ -36,7 +36,7 @@ async function requestJson(url, init) {
 }
 
 async function createRelease(baseUrl, overrides = {}) {
-  const input = { systemId: "MEMBER", name: "会員基盤リリース", version: "v1.3.0", releaseDate: "2026-08-01 22:00", environment: "Production", manager: "山田", ...overrides };
+  const input = { systemId: "MEMBER", name: "会員基盤リリース", projectNumber: "PJ-MEMBER-001", releaseDate: "2026-08-01 22:00", environment: "Production", manager: "山田", ...overrides };
   const work = {
     release: { id: 0, ...input, status: "準備中", updatedBy: input.manager, updatedAt: new Date().toISOString() },
     timeline: [], staffing: [], approvals: [], links: [],
@@ -64,7 +64,7 @@ test("SPA contains editable release-operation controls", async () => {
     readFile(new URL("../src/api.ts", import.meta.url), "utf8"),
     readFile(new URL("../index.html", import.meta.url), "utf8"),
   ]);
-  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "一覧を更新", "作業一覧へ戻る", "この作業", "共有URLをコピー", "URLをコピーしました", "作業をコピー", "コピーを作成", "明細をコピー", "バージョン（任意）", "バージョン未設定", "SystemIDで絞り込み", "作業状態で絞り込み", "未完了", "作業を削除", "この操作は取り消せません", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "＋ 体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "作業タイトル", "内容（任意）", "紐づける申請物（任意）", "申請物一覧へ申請", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "未申請", "申請中", "回付済", "結了済", "申請リンク（任意）", "手順書・関連リンク", "リンク情報を編集", "URL（任意）", "情報を編集", "リンクを開く", "リンク未登録", "当日作業の開始から8時間", "当日体制から選択または入力", "種別", "入力内容を保存できません", "▶ 開始", "✓ 完了", "申請種別管理", "申請種別を追加", "認証・権限制御なし", "自由入力対応", "申請種別（任意）", "候補から選択または手入力"]) {
+  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "一覧を更新", "作業一覧へ戻る", "この作業", "共有URLをコピー", "URLをコピーしました", "作業をコピー", "コピーを作成", "明細をコピー", "プロジェクト番号（任意）", "プロジェクト番号未設定", "作業をグループ化", "グループなし", "SystemIDで絞り込み", "作業状態で絞り込み", "未完了", "作業を削除", "この操作は取り消せません", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "＋ 体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "作業タイトル", "内容（任意）", "紐づける申請物（任意）", "申請物一覧へ申請", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "未申請", "申請中", "回付済", "結了済", "申請リンク（任意）", "手順書・関連リンク", "リンク情報を編集", "URL（任意）", "情報を編集", "リンクを開く", "リンク未登録", "当日作業の開始から8時間", "当日体制から選択または入力", "種別", "入力内容を保存できません", "▶ 開始", "✓ 完了", "申請種別管理", "申請種別を追加", "認証・権限制御なし", "自由入力対応", "申請種別（任意）", "候補から選択または手入力"]) {
     assert.match(app, new RegExp(label));
   }
   assert.match(app, /PreviewModal/);
@@ -81,7 +81,9 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(app, /setInterval\(\(\) => setCurrentMinute\(currentLocalMinutes\(\)\), 30_000\)/);
   assert.match(app, /\[15, 30, 60\]\.map/);
   assert.match(app, /values\.startAt =/);
-  assert.doesNotMatch(app, /name="version"[^>]*required/);
+  assert.doesNotMatch(app, /name="version"/);
+  assert.match(app, /name="projectNumber"/);
+  assert.match(app, /projectGroups\.map/);
   assert.match(app, /name="due" type="date"/);
   assert.doesNotMatch(app, /name="url"[^>]*required/);
   assert.match(app, /status === "承認済み"\) return "結了済"/);
@@ -114,6 +116,7 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(apiClient, /recordFromWork/);
   assert.match(apiClient, /summaryFromRecord/);
   assert.match(apiClient, /createReleaseCopy/);
+  assert.match(apiClient, /projectNumber: release\.projectNumber \|\| version \|\| ""/);
   assert.match(apiClient, /method: "DELETE"/);
   assert.match(apiClient, /\/v2\/categories/);
   assert.match(apiClient, /category\.scope === scope/);
@@ -161,8 +164,8 @@ test("development command starts both the SPA and v2-compatible local API", asyn
 
 test("v2-compatible local API migrates legacy time-only details across midnight", async (context) => {
   const baseUrl = await startServer(context);
-  const created = await createRelease(baseUrl, { version: "" });
-  assert.equal(created.release.version, "");
+  const created = await createRelease(baseUrl, { projectNumber: "" });
+  assert.equal(created.release.projectNumber, "");
   delete created.release.systemId;
   created.timeline.push(
     { id: 1, time: "23:50", endTime: "00:10", title: "デプロイ", owner: "山田", status: "完了" },
@@ -187,6 +190,13 @@ test("v2-compatible local API migrates legacy time-only details across midnight"
   assert.equal(saved.timeline[0].actualEndAt, "");
   assert.equal("time" in saved.timeline[0], false);
   assert.equal("startTime" in saved.staffing[0], false);
+});
+
+test("v2-compatible local API migrates legacy release version to project number", async (context) => {
+  const baseUrl = await startServer(context);
+  const created = await createRelease(baseUrl, { projectNumber: undefined, version: "v1.3.0" });
+  assert.equal(created.release.projectNumber, "v1.3.0");
+  assert.equal("version" in created.release, false);
 });
 
 test("v2-compatible local API persists release records and work edits", async (context) => {

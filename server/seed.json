@@ -5,7 +5,7 @@
         "id": 1,
         "systemId": "PAYMENT",
         "name": "決済基盤アップデート",
-        "version": "v2.8.0",
+        "projectNumber": "PJ-2026-024",
         "releaseDate": "2026-07-24 22:00",
         "environment": "Production",
         "status": "準備中",

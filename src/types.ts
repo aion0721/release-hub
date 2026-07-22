@@ -58,7 +58,7 @@ export type ReleaseWork = {
     id: number;
     systemId: string;
     name: string;
-    version: string;
+    projectNumber: string;
     releaseDate: string;
     environment: string;
     status: string;
@@ -84,5 +84,5 @@ export type ReleaseSummary = ReleaseWork["release"] & {
 
 export type CreateReleaseInput = Pick<
   ReleaseWork["release"],
-  "systemId" | "name" | "version" | "releaseDate" | "environment" | "manager"
+  "systemId" | "name" | "projectNumber" | "releaseDate" | "environment" | "manager"
 >;

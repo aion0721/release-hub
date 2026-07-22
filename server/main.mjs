@@ -79,6 +79,8 @@ function normalizeRecord(record) {
   record.release.id = record.id;
   record.release.manager ||= record.release.updatedBy || "未設定";
   record.release.systemId ||= "未設定";
+  record.release.projectNumber ||= record.release.version || "";
+  delete record.release.version;
   record.timeline ||= [];
   record.staffing ||= [];
   record.approvals ||= [];

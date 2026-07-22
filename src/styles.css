@@ -336,6 +336,12 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .list-hero li { display:flex; align-items:center; gap:8px; color:#eef6ff; font-size:11px; font-weight:700; white-space:nowrap; }
 .list-hero li i { width:22px; height:22px; display:grid; place-items:center; border-radius:50%; background:#ffffff16; border:1px solid #ffffff30; color:#8dc1ff; font-size:9px; font-style:normal; }
 .work-list-panel { overflow:hidden; }
+.project-groups { display:grid; }
+.project-group+.project-group { border-top:8px solid #eef2f6; }
+.project-group-heading { display:flex; align-items:center; gap:9px; padding:10px 22px; border-bottom:1px solid #e6ebf1; background:#f7f9fc; }
+.project-group-heading span { color:#75869b; font-size:8px; font-weight:900; letter-spacing:.14em; }
+.project-group-heading strong { color:#294f7e; font-size:11px; }
+.project-group-heading small { margin-left:auto; color:#8390a1; font-size:9px; font-weight:800; }
 .list-count { padding:5px 9px; border-radius:20px; background:#f0f4f8; color:#66778d; font-size:10px; font-weight:700; }
 .work-list-heading { gap:16px; }
 .work-view-controls { display:flex; align-items:flex-end; gap:10px; }
