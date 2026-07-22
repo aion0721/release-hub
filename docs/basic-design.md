@@ -188,11 +188,13 @@ erDiagram
 | `endAt` | string | Yes | 予定終了 `YYYY-MM-DDTHH:mm` |
 | `actualStartAt` | string | No | 実績開始。未入力時は空文字 |
 | `actualEndAt` | string | No | 実績終了。未入力時は空文字 |
-| `title` | string | Yes | 作業内容 |
+| `title` | string | Yes | 作業タイトル |
+| `content` | string | Yes | 作業内容。未入力時は空文字 |
 | `owner` | string | Yes | 担当者 |
 | `status` | enum | Yes | 未着手／進行中／完了 |
 | `plan` | enum | Yes | 本線／コンチプラン |
 | `kind` | enum | No | 作業／申請物。未設定は作業として正規化 |
+| `approvalId` | number | No | kindが申請物の場合に紐づけるApprovalItemのID |
 
 ### 5.4 StaffingAssignment
 

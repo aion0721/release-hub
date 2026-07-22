@@ -10,10 +10,12 @@ export type TimelineItem = {
   actualStartAt?: string;
   actualEndAt?: string;
   title: string;
+  content: string;
   owner: string;
   status: TimelineStatus;
   plan: TimelinePlan;
   kind?: TimelineKind;
+  approvalId?: number;
 };
 
 export type ApprovalItem = {

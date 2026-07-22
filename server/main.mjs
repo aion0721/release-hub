@@ -119,6 +119,9 @@ function normalizeTimeline(work) {
   for (const item of work.timeline) {
     item.plan ||= "本線";
     item.kind ||= "作業";
+    item.content ||= "";
+    if (item.kind === "申請物" && Number.isInteger(Number(item.approvalId)) && Number(item.approvalId) > 0) item.approvalId = Number(item.approvalId);
+    else delete item.approvalId;
     if (!item.startAt) {
       const startMinutes = timeMinutes(item.time);
       if (previousMinutes !== null && startMinutes < previousMinutes) dayOffset += 1;

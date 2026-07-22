@@ -36,6 +36,8 @@ button.nav-item { width:100%; border:0; background:transparent; text-align:left;
 .list-actions { display:flex; align-items:center; gap:8px; }
 .list-actions .primary-button { margin-left:4px; }
 .top-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; color:#64748b; font-size:12px; }
+.top-actions .ghost-button { border:1px solid #ced8e5; background:#fff; box-shadow:0 2px 6px #17395f0a; }
+.top-actions .ghost-button:hover { border-color:#9fb3ca; background:#f7faff; }
 .live-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 4px #dcfce7; }
 .live-dot.saving { background:#f59e0b; box-shadow:0 0 0 4px #fef3c7; }
 .primary-button,.ghost-button { border:0; border-radius:8px; font-weight:700; cursor:pointer; transition:.18s ease; }
@@ -124,6 +126,8 @@ button.nav-item { width:100%; border:0; background:transparent; text-align:left;
 .done .line i { border-color:#16a36e; background:#16a36e; color:#fff; }
 .task { display:grid; gap:4px; padding-left:7px; }
 .task strong,.approval-row strong { font-size:12px; }
+.timeline-content { overflow:hidden; color:#5f6f82!important; text-overflow:ellipsis; white-space:nowrap; }
+.timeline-approval-link { justify-self:start; padding:2px 6px; border-radius:4px; color:#75500d!important; background:#fff2d6; font-weight:800; }
 .timeline-kind { display:inline-flex; margin-right:6px; padding:2px 5px; border-radius:4px; color:#265d9d; background:#e8f1fb; font-size:8px; vertical-align:1px; }
 .timeline-kind.kind-申請物 { color:#8a5b09; background:#fff2d6; }
 .timeline-row-actions { display:grid; justify-items:end; gap:5px; }
@@ -172,9 +176,9 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .modal-head button { border:0; background:none; color:#77869a; font-size:25px; cursor:pointer; }
 .modal form { display:grid; gap:14px; padding:20px 24px 24px; }
 .modal label { display:grid; gap:6px; color:#4b5c72; font-size:11px; font-weight:700; }
-.modal input { width:100%; padding:10px 11px; border:1px solid #d9e0e8; border-radius:7px; outline:0; }
+.modal input,.modal textarea { width:100%; padding:10px 11px; border:1px solid #d9e0e8; border-radius:7px; outline:0; resize:vertical; }
 .modal select { width:100%; padding:10px 11px; border:1px solid #d9e0e8; border-radius:7px; background:#fff; outline:0; }
-.modal input:focus { border-color:#4b83d0; box-shadow:0 0 0 3px #dbeafe; }
+.modal input:focus,.modal textarea:focus { border-color:#4b83d0; box-shadow:0 0 0 3px #dbeafe; }
 .modal select:focus { border-color:#4b83d0; box-shadow:0 0 0 3px #dbeafe; }
 .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
 .modal-actions .primary-button { margin:0; }
