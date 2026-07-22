@@ -63,7 +63,7 @@ test("SPA contains editable release-operation controls", async () => {
     readFile(new URL("../src/api.ts", import.meta.url), "utf8"),
     readFile(new URL("../index.html", import.meta.url), "utf8"),
   ]);
-  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "一覧を更新", "作業一覧へ戻る", "この作業", "共有URLをコピー", "URLをコピーしました", "作業をコピー", "コピーを作成", "明細をコピー", "バージョン（任意）", "バージョン未設定", "SystemIDで絞り込み", "作業状態で絞り込み", "未完了", "作業を削除", "この操作は取り消せません", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "体制を追加", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "未申請", "申請中", "回付済", "結了済", "申請リンク（任意）", "手順書・関連リンク", "リンク情報を編集", "URL（任意）", "情報を編集", "リンクを開く", "リンク未登録"]) {
+  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "一覧を更新", "作業一覧へ戻る", "この作業", "共有URLをコピー", "URLをコピーしました", "作業をコピー", "コピーを作成", "明細をコピー", "バージョン（任意）", "バージョン未設定", "SystemIDで絞り込み", "作業状態で絞り込み", "未完了", "作業を削除", "この操作は取り消せません", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "体制を追加", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "未申請", "申請中", "回付済", "結了済", "申請リンク（任意）", "手順書・関連リンク", "リンク情報を編集", "URL（任意）", "情報を編集", "リンクを開く", "リンク未登録", "当日作業の開始から8時間", "当日体制から選択または入力", "種別", "入力内容を保存できません", "▶ 開始", "✓ 完了"]) {
     assert.match(app, new RegExp(label));
   }
   assert.match(app, /PreviewModal/);
@@ -92,6 +92,11 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(app, /const minuteDelta =/);
   assert.match(app, /actualStartAt: "", actualEndAt: "", status: "未着手"/);
   assert.match(app, /status: "未申請", url: ""/);
+  assert.match(app, /item\.kind \|\| "作業"/);
+  assert.match(app, /toMinutes\(staffingStartAt\) \+ 8 \* 60/);
+  assert.match(app, /list="staffing-owner-options"/);
+  assert.match(app, /role="alert"/);
+  assert.match(app, /updateTimelineStatus/);
   const timelineModalSource = app.slice(app.indexOf('{type === "timeline"'), app.indexOf('{type === "approval"'));
   assert.ok(timelineModalSource.indexOf('name="title"') < timelineModalSource.indexOf('name="plan"'));
   const previewSource = app.slice(app.indexOf("function PreviewModal"));
@@ -159,6 +164,7 @@ test("v2-compatible local API migrates legacy time-only details across midnight"
     ["2026-08-02T00:15", "2026-08-02T00:45"],
   ]);
   assert.equal(saved.timeline[0].plan, "本線");
+  assert.equal(saved.timeline[0].kind, "作業");
   assert.equal(saved.staffing[0].startAt, "2026-08-01T21:00");
   assert.equal(saved.staffing[0].endAt, "2026-08-02T01:00");
   assert.equal(saved.staffing[0].phone, "");
@@ -180,7 +186,7 @@ test("v2-compatible local API persists release records and work edits", async (c
   const created = await createRelease(baseUrl);
   created.timeline = [
     { id: 1, startAt: "2026-08-01T22:00", endAt: "2026-08-01T22:30", actualStartAt: "2026-08-01T22:05", actualEndAt: "2026-08-01T22:42", title: "本番デプロイ", owner: "山田", status: "完了", plan: "本線" },
-    { id: 2, startAt: "2026-08-01T22:30", endAt: "2026-08-01T23:00", title: "切り戻し", owner: "佐藤", status: "未着手", plan: "コンチプラン" },
+    { id: 2, startAt: "2026-08-01T22:30", endAt: "2026-08-01T23:00", title: "切り戻し判定", owner: "佐藤", status: "未着手", plan: "コンチプラン", kind: "申請物" },
   ];
   created.staffing = [{ id: 1, name: "佐藤", phone: "090-1111-2222", startAt: "2026-08-01T21:00", endAt: "2026-08-02T01:00", location: "オンコール", note: "一次連絡先" }];
   created.approvals = [{ id: 1, title: "本番変更申請", owner: "佐藤", due: "2026-08-01", status: "申請中", url: "" }];
@@ -207,6 +213,7 @@ test("v2-compatible local API persists release records and work edits", async (c
   assert.equal(reloaded.body.release.manager, "佐藤");
   assert.deepEqual(reloaded.body.timeline.map((item) => item.id), [2, 1]);
   assert.equal(reloaded.body.timeline[0].plan, "コンチプラン");
+  assert.equal(reloaded.body.timeline[0].kind, "申請物");
   assert.equal(reloaded.body.timeline[1].actualStartAt, "2026-08-01T22:05");
   assert.equal(reloaded.body.timeline[1].actualEndAt, "2026-08-01T22:42");
   assert.equal(reloaded.body.staffing[0].phone, "090-3333-4444");

@@ -14,8 +14,8 @@
         "updatedAt": ""
       },
       "timeline": [
-        { "id": 1, "startAt": "2026-07-24T21:30", "endAt": "2026-07-24T22:00", "actualStartAt": "2026-07-24T21:32", "actualEndAt": "2026-07-24T22:04", "title": "リリース開始判定", "owner": "田中", "status": "完了", "plan": "本線" },
-        { "id": 2, "startAt": "2026-07-24T22:00", "endAt": "2026-07-24T22:10", "title": "メンテナンスモード切替", "owner": "佐藤", "status": "未着手", "plan": "本線" },
+        { "id": 1, "startAt": "2026-07-24T21:30", "endAt": "2026-07-24T22:00", "actualStartAt": "2026-07-24T21:32", "actualEndAt": "2026-07-24T22:04", "title": "リリース開始判定", "owner": "田中", "status": "完了", "plan": "本線", "kind": "申請物" },
+        { "id": 2, "startAt": "2026-07-24T22:00", "endAt": "2026-07-24T22:10", "title": "メンテナンスモード切替", "owner": "佐藤", "status": "未着手", "plan": "本線", "kind": "作業" },
         { "id": 3, "startAt": "2026-07-24T22:10", "endAt": "2026-07-24T22:30", "title": "アプリケーションデプロイ", "owner": "鈴木", "status": "未着手", "plan": "本線" },
         { "id": 4, "startAt": "2026-07-24T22:30", "endAt": "2026-07-24T23:00", "title": "疎通・業務動作確認", "owner": "QAチーム", "status": "未着手", "plan": "本線" },
         { "id": 5, "startAt": "2026-07-24T23:00", "endAt": "2026-07-24T23:15", "title": "完了判定・周知", "owner": "田中", "status": "未着手", "plan": "本線" }

@@ -108,7 +108,8 @@ button.nav-item { width:100%; border:0; background:transparent; text-align:left;
 .staffing-person,.staffing-time { min-width:0; display:grid; gap:3px; }
 .staffing-person strong,.staffing-time strong { overflow:hidden; color:#283b53; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
 .staffing-person small,.staffing-time small { overflow:hidden; color:#8794a5; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
-.timeline-row { width:100%; display:grid; grid-template-columns:18px 76px 36px minmax(0,1fr) auto; align-items:center; min-height:66px; padding:0; background:none; border:0; border-bottom:1px solid #eff2f5; text-align:left; cursor:grab; }
+.timeline-row { width:100%; display:grid; grid-template-columns:18px 76px 36px minmax(0,1fr) 88px; align-items:center; min-height:72px; padding:0; background:none; border:0; border-bottom:1px solid #eff2f5; text-align:left; cursor:grab; }
+.timeline-row:focus-visible { outline:2px solid #79a9e8; outline-offset:-2px; }
 .timeline-row:active { cursor:grabbing; }
 .timeline-row.dragging { opacity:.42; }
 .drag-handle { color:#a2adba; font-size:15px; pointer-events:none; user-select:none; }
@@ -123,11 +124,20 @@ button.nav-item { width:100%; border:0; background:transparent; text-align:left;
 .done .line i { border-color:#16a36e; background:#16a36e; color:#fff; }
 .task { display:grid; gap:4px; padding-left:7px; }
 .task strong,.approval-row strong { font-size:12px; }
+.timeline-kind { display:inline-flex; margin-right:6px; padding:2px 5px; border-radius:4px; color:#265d9d; background:#e8f1fb; font-size:8px; vertical-align:1px; }
+.timeline-kind.kind-申請物 { color:#8a5b09; background:#fff2d6; }
+.timeline-row-actions { display:grid; justify-items:end; gap:5px; }
+.timeline-action { min-width:62px; padding:5px 8px; border:1px solid #bad3ef; border-radius:6px; color:#225d9f; background:#eef5fd; font-size:9px; font-weight:800; cursor:pointer; }
+.timeline-action:hover { background:#deecfb; }
+.timeline-action.complete { border-color:#a9dbc8; color:#087956; background:#e8f8f1; }
+.timeline-action:disabled { opacity:.55; cursor:wait; }
 .task small,.approval-row small { color:#8793a3; font-size:10px; }
 .time-kind { display:inline-flex; margin-right:6px; padding:2px 5px; border-radius:4px; font-size:8px; }
 .time-kind.planned { color:#526a85; background:#edf1f5; }
 .time-kind.actual { color:#087956; background:#e5f7ef; }
 .actual-time.recorded,.actual-recorded { color:#27745e!important; }
+.gantt-status-actions { display:flex; align-items:center; gap:5px; margin-top:3px; }
+.gantt-status-actions .timeline-action { min-width:auto; padding:3px 6px; }
 .tag { display:inline-flex; justify-content:center; min-width:55px; padding:4px 7px; border-radius:20px; font-size:9px; font-weight:800; white-space:nowrap; }
 .status-未着手,.status-未申請 { background:#f1f4f7; color:#718096; }
 .status-進行中,.status-申請中 { background:#fff3d8; color:#b76700; }
@@ -153,6 +163,9 @@ button.nav-item { width:100%; border:0; background:transparent; text-align:left;
 footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .modal-backdrop { position:fixed; inset:0; z-index:50; display:grid; place-items:center; padding:20px; background:#0c1d32a8; backdrop-filter:blur(3px); }
 .modal { width:min(460px,100%); background:white; border-radius:12px; box-shadow:0 24px 70px #07152566; overflow:hidden; }
+.form-error { display:grid; gap:3px; margin:14px 18px 0; padding:10px 12px; border:1px solid #f2a6a6; border-radius:8px; color:#991b1b; background:#fff1f1; font-size:10px; }
+.form-error strong { font-size:11px; }
+.timeline-classification { grid-template-columns:repeat(3,minmax(0,1fr)); }
 .modal-head { display:flex; justify-content:space-between; align-items:center; padding:22px 24px 15px; border-bottom:1px solid #edf0f3; }
 .modal-head h2 { margin:4px 0 0; font-size:18px; }
 .modal-head button { border:0; background:none; color:#77869a; font-size:25px; cursor:pointer; }

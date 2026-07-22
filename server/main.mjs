@@ -91,6 +91,7 @@ function normalizeTimeline(work) {
   let previousMinutes = null;
   for (const item of work.timeline) {
     item.plan ||= "本線";
+    item.kind ||= "作業";
     if (!item.startAt) {
       const startMinutes = timeMinutes(item.time);
       if (previousMinutes !== null && startMinutes < previousMinutes) dayOffset += 1;

@@ -1,5 +1,6 @@
 export type TimelineStatus = "未着手" | "進行中" | "完了";
 export type TimelinePlan = "本線" | "コンチプラン";
+export type TimelineKind = "作業" | "申請物";
 export type ApprovalStatus = "未申請" | "申請中" | "回付済" | "結了済";
 
 export type TimelineItem = {
@@ -12,6 +13,7 @@ export type TimelineItem = {
   owner: string;
   status: TimelineStatus;
   plan: TimelinePlan;
+  kind?: TimelineKind;
 };
 
 export type ApprovalItem = {

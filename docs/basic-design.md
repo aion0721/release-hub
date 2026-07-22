@@ -192,6 +192,7 @@ erDiagram
 | `owner` | string | Yes | 担当者 |
 | `status` | enum | Yes | 未着手／進行中／完了 |
 | `plan` | enum | Yes | 本線／コンチプラン |
+| `kind` | enum | No | 作業／申請物。未設定は作業として正規化 |
 
 ### 5.4 StaffingAssignment
 
@@ -247,7 +248,7 @@ erDiagram
 
 | 層 | 方針 |
 | --- | --- |
-| フォーム | 予定・実績の時系列矛盾を保存前に日本語で表示 |
+| フォーム | 予定・実績の時系列矛盾を保存前にモーダル内の`role=alert`で日本語表示 |
 | APIクライアント | 404は対象なし、それ以外は共有データ処理失敗として表示 |
 | React保存 | 楽観更新を取り消し、直前状態へ戻す |
 | 共有API | light-api-server v2が4xx、5xxをJSONで返す |
