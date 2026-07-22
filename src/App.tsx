@@ -1,15 +1,15 @@
 import { type CSSProperties, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createApprovalCategory, createReleaseCopy, createReleaseWork, deleteApprovalCategory, deleteReleaseWork, fetchApprovalCategories, fetchReleaseSummaries, fetchReleaseWork, saveApprovalCategory, saveReleaseWork } from "./api";
+import { createCategory, createReleaseCopy, createReleaseWork, deleteCategory, deleteReleaseWork, fetchCategories, fetchReleaseSummaries, fetchReleaseWork, saveCategory, saveReleaseWork } from "./api";
 import { sampleWork } from "./sampleData";
-import type { ApprovalCategory, ApprovalItem, ApprovalStatus, CreateReleaseInput, ReleaseSummary, ReleaseWork, ResourceLink, StaffingAssignment, TimelineItem, TimelineKind, TimelinePlan, TimelineStatus } from "./types";
+import type { ApprovalItem, ApprovalStatus, Category, CreateReleaseInput, ReleaseSummary, ReleaseWork, ResourceLink, StaffingAssignment, TimelineItem, TimelineKind, TimelinePlan, TimelineStatus } from "./types";
 
 type ModalType = "work" | "staffing" | "timeline" | "approval" | "link";
 type PreviewItem = { type: "approval"; item: ApprovalItem } | { type: "link"; item: ResourceLink };
 type EditTarget = { type: "work"; item: ReleaseWork["release"] } | { type: "staffing"; item: StaffingAssignment } | { type: "timeline"; item: TimelineItem } | { type: "approval"; item: ApprovalItem } | { type: "link"; item: ResourceLink };
 const demoMode = import.meta.env.VITE_DEMO_MODE === "true";
-const sampleApprovalCategories: ApprovalCategory[] = [
-  { id: 1, name: "資源配布", description: "サーバー、ストレージ、アカウントなどの資源配布に関する申請" },
-  { id: 2, name: "WF", description: "社内ワークフローで回付する申請" },
+const sampleApprovalCategories: Category[] = [
+  { id: 1, scope: "approval", name: "資源配布", description: "サーバー、ストレージ、アカウントなどの資源配布に関する申請" },
+  { id: 2, scope: "approval", name: "WF", description: "社内ワークフローで回付する申請" },
 ];
 
 function nextId(items: Array<{ id: number }>) {
@@ -109,7 +109,7 @@ export default function App() {
   demoWorksRef.current = demoWorks;
   const [selected, setSelected] = useState<ReleaseWork | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
-  const [approvalCategories, setApprovalCategories] = useState<ApprovalCategory[]>(sampleApprovalCategories);
+  const [approvalCategories, setApprovalCategories] = useState<Category[]>(sampleApprovalCategories);
   const [categorySaving, setCategorySaving] = useState(false);
   const [categoryError, setCategoryError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -140,7 +140,7 @@ export default function App() {
 
   useEffect(() => {
     void loadSummaries();
-    if (!demoMode) void fetchApprovalCategories().then((categories) => { setApprovalCategories(categories); setCategoryError(""); }).catch((reason) => setCategoryError(reason instanceof Error ? reason.message : "申請種別を読み込めませんでした"));
+    if (!demoMode) void fetchCategories("approval").then((categories) => { setApprovalCategories(categories); setCategoryError(""); }).catch((reason) => setCategoryError(reason instanceof Error ? reason.message : "申請種別を読み込めませんでした"));
   }, [loadSummaries]);
 
   useEffect(() => {
@@ -220,13 +220,13 @@ export default function App() {
     }
     if (demoMode) {
       const id = nextId(approvalCategories);
-      setApprovalCategories((current) => [...current, { id, name: normalizedName, description: description.trim() }]);
+      setApprovalCategories((current) => [...current, { id, scope: "approval", name: normalizedName, description: description.trim() }]);
       setCategoryError("");
       return true;
     }
     setCategorySaving(true);
     try {
-      const created = await createApprovalCategory({ name: normalizedName, description: description.trim() });
+      const created = await createCategory({ scope: "approval", name: normalizedName, description: description.trim() });
       setApprovalCategories((current) => [...current, created]);
       setCategoryError("");
       return true;
@@ -238,7 +238,7 @@ export default function App() {
     }
   }
 
-  async function updateApprovalCategory(category: ApprovalCategory) {
+  async function updateApprovalCategory(category: Category) {
     const normalizedName = category.name.trim();
     if (approvalCategories.some((item) => item.id !== category.id && item.name.toLocaleLowerCase("ja") === normalizedName.toLocaleLowerCase("ja"))) {
       setCategoryError("同じ名前の申請種別がすでに登録されています");
@@ -252,7 +252,7 @@ export default function App() {
     }
     setCategorySaving(true);
     try {
-      const saved = await saveApprovalCategory(nextCategory);
+      const saved = await saveCategory(nextCategory);
       setApprovalCategories((current) => current.map((item) => item.id === saved.id ? saved : item));
       setCategoryError("");
       return true;
@@ -272,7 +272,7 @@ export default function App() {
     }
     setCategorySaving(true);
     try {
-      await deleteApprovalCategory(id);
+      await deleteCategory(id);
       setApprovalCategories((current) => current.filter((category) => category.id !== id));
       setCategoryError("");
       return true;
@@ -573,7 +573,7 @@ function Sidebar({ detailOpen, adminOpen, onShowList, onShowAdmin }: { detailOpe
   </aside>;
 }
 
-function ApprovalCategoryAdmin({ categories, saving, error, onBack, onCreate, onSave, onDelete }: { categories: ApprovalCategory[]; saving: boolean; error: string; onBack: () => void; onCreate: (name: string, description: string) => Promise<boolean>; onSave: (category: ApprovalCategory) => Promise<boolean>; onDelete: (id: number) => Promise<boolean> }) {
+function ApprovalCategoryAdmin({ categories, saving, error, onBack, onCreate, onSave, onDelete }: { categories: Category[]; saving: boolean; error: string; onBack: () => void; onCreate: (name: string, description: string) => Promise<boolean>; onSave: (category: Category) => Promise<boolean>; onDelete: (id: number) => Promise<boolean> }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
@@ -584,7 +584,7 @@ function ApprovalCategoryAdmin({ categories, saving, error, onBack, onCreate, on
     if (await onCreate(String(values.name), String(values.description || ""))) form.reset();
   }
 
-  async function submitEdit(event: FormEvent<HTMLFormElement>, category: ApprovalCategory) {
+  async function submitEdit(event: FormEvent<HTMLFormElement>, category: Category) {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
     if (await onSave({ ...category, name: String(values.name), description: String(values.description || "") })) setEditingId(null);
@@ -902,7 +902,7 @@ function DeleteConfirmModal({ work, saving, onClose, onConfirm }: { work: Releas
   return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><div className="modal delete-confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-description" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="section-kicker danger">DELETE RELEASE WORK</span><h2 id="delete-confirm-title">リリース作業を削除しますか？</h2></div><button onClick={onClose} aria-label="閉じる" disabled={saving}>×</button></div><div className="delete-confirm-body"><strong>{work.release.name}</strong><p id="delete-confirm-description">タイムチャート、当日体制、申請物、関連リンクを含む{detailCount}件の明細も削除されます。この操作は取り消せません。</p></div><div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose} disabled={saving}>キャンセル</button><button type="button" className="danger-button solid" onClick={onConfirm} disabled={saving}>{saving ? "削除中" : "作業を削除する"}</button></div></div></div>;
 }
 
-function ItemModal({ type, editTarget, releaseDate, staffing: staffingOptions, approvalCategories, formError, saving, onClose, onSubmit }: { type: ModalType; editTarget: EditTarget | null; releaseDate?: string; staffing: StaffingAssignment[]; approvalCategories: ApprovalCategory[]; formError: string; saving: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+function ItemModal({ type, editTarget, releaseDate, staffing: staffingOptions, approvalCategories, formError, saving, onClose, onSubmit }: { type: ModalType; editTarget: EditTarget | null; releaseDate?: string; staffing: StaffingAssignment[]; approvalCategories: Category[]; formError: string; saving: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   const work = editTarget?.type === "work" ? editTarget.item : null;
   const staffing = editTarget?.type === "staffing" ? editTarget.item : null;
   const timeline = editTarget?.type === "timeline" ? editTarget.item : null;

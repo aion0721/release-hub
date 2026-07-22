@@ -5,8 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-async function startServer(context) {
+async function startServer(context, prepareDataDir) {
   const dataDir = await mkdtemp(join(tmpdir(), "release-hub-test-"));
+  if (prepareDataDir) await prepareDataDir(dataDir);
   const child = spawn(process.execPath, ["server/main.mjs"], {
     cwd: new URL("..", import.meta.url),
     env: { ...process.env, PORT: "0", DATA_DIR: dataDir },
@@ -109,7 +110,8 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(apiClient, /summaryFromRecord/);
   assert.match(apiClient, /createReleaseCopy/);
   assert.match(apiClient, /method: "DELETE"/);
-  assert.match(apiClient, /\/v2\/approval-categories/);
+  assert.match(apiClient, /\/v2\/categories/);
+  assert.match(apiClient, /category\.scope === scope/);
   assert.match(html, /Release Hub \| リリース情報をひとつに/);
 });
 
@@ -134,9 +136,9 @@ test("project documentation covers current product, API, design, and acceptance 
     readFile(new URL("../docs/test-spec.md", import.meta.url), "utf8"),
   ]);
   for (const path of ["docs/requirements.md", "docs/basic-design.md", "docs/api-spec.md", "docs/test-spec.md"]) assert.match(readme, new RegExp(path));
-  for (const term of ["SystemID", "コンチプラン", "表示範囲外", "VITE_DEMO_MODE", "申請種別管理", "approval-categories"]) assert.match(requirements, new RegExp(term));
+  for (const term of ["SystemID", "コンチプラン", "表示範囲外", "VITE_DEMO_MODE", "申請種別管理", "scope=approval"]) assert.match(requirements, new RegExp(term));
   for (const term of ["mermaid", "release.json", "GitLab CI", "GitHub Actions"]) assert.match(design, new RegExp(term));
-  for (const endpoint of ["GET /health", "GET /v2/releases", "POST /v2/releases", "PUT /v2/releases/:id", "GET /v2/approval-categories", "POST /v2/approval-categories"]) assert.match(api, new RegExp(endpoint));
+  for (const endpoint of ["GET /health", "GET /v2/releases", "POST /v2/releases", "PUT /v2/releases/:id", "GET /v2/categories", "POST /v2/categories"]) assert.match(api, new RegExp(endpoint));
   for (const testId of ["FT-020", "FT-046", "API-007", "MIG-006", "NFT-008"]) assert.match(testSpec, new RegExp(testId));
 });
 
@@ -232,32 +234,41 @@ test("v2-compatible local API persists release records and work edits", async (c
   assert.equal(record.release.systemId, "MEMBER-CORE");
 });
 
-test("v2-compatible local API manages approval categories", async (context) => {
+test("v2-compatible local API manages scoped categories", async (context) => {
   const baseUrl = await startServer(context);
-  const initial = await requestJson(`${baseUrl}/v2/approval-categories`);
+  const initial = await requestJson(`${baseUrl}/v2/categories`);
   assert.equal(initial.response.status, 200);
   assert.deepEqual(initial.body.map((category) => category.name), ["資源配布", "WF"]);
+  assert.deepEqual(initial.body.map((category) => category.scope), ["approval", "approval"]);
 
-  const created = await requestJson(`${baseUrl}/v2/approval-categories`, {
+  const created = await requestJson(`${baseUrl}/v2/categories`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ id: 0, name: "セキュリティ審査", description: "事前確認" }),
+    body: JSON.stringify({ id: 0, scope: "resource-link", name: "監視", description: "監視ツール" }),
   });
   assert.equal(created.response.status, 201);
   assert.equal(created.body.id, 3);
 
-  const updated = await requestJson(`${baseUrl}/v2/approval-categories/${created.body.id}`, {
+  const updated = await requestJson(`${baseUrl}/v2/categories/${created.body.id}`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...created.body, name: "セキュリティ申請", description: "リリース前審査" }),
+    body: JSON.stringify({ ...created.body, name: "監視・ログ", description: "監視とログ確認" }),
   });
   assert.equal(updated.response.status, 200);
-  assert.equal(updated.body.name, "セキュリティ申請");
+  assert.equal(updated.body.name, "監視・ログ");
+  assert.equal(updated.body.scope, "resource-link");
 
-  const deleted = await requestJson(`${baseUrl}/v2/approval-categories/${created.body.id}`, { method: "DELETE" });
+  const deleted = await requestJson(`${baseUrl}/v2/categories/${created.body.id}`, { method: "DELETE" });
   assert.equal(deleted.response.status, 200);
-  assert.equal((await requestJson(`${baseUrl}/v2/approval-categories`)).body.length, 2);
-  assert.equal((await requestJson(`${baseUrl}/v2/approval-categories/${created.body.id}`, { method: "DELETE" })).response.status, 404);
+  assert.equal((await requestJson(`${baseUrl}/v2/categories`)).body.length, 2);
+  assert.equal((await requestJson(`${baseUrl}/v2/categories/${created.body.id}`, { method: "DELETE" })).response.status, 404);
+});
+
+test("v2-compatible local API migrates legacy approval categories into scoped categories", async (context) => {
+  const baseUrl = await startServer(context, (dataDir) => writeFile(join(dataDir, "approval-categories.json"), JSON.stringify([{ id: 7, name: "旧WF", description: "旧マスタ" }]), "utf8"));
+  const categories = await requestJson(`${baseUrl}/v2/categories`);
+  assert.equal(categories.response.status, 200);
+  assert.deepEqual(categories.body, [{ id: 7, scope: "approval", name: "旧WF", description: "旧マスタ" }]);
 });
 
 test("v2-compatible local API rejects invalid mutations and reports missing resources", async (context) => {

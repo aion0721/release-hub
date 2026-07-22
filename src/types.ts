@@ -26,8 +26,9 @@ export type ApprovalItem = {
   url: string;
 };
 
-export type ApprovalCategory = {
+export type Category = {
   id: number;
+  scope: string;
   name: string;
   description: string;
 };

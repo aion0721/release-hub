@@ -1,9 +1,9 @@
-import type { ApprovalCategory, CreateReleaseInput, ReleaseRecord, ReleaseSummary, ReleaseWork } from "./types";
+import type { Category, CreateReleaseInput, ReleaseRecord, ReleaseSummary, ReleaseWork } from "./types";
 
 const configuredBase = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const apiBase = configuredBase.replace(/\/$/, "");
 const releasesPath = "/v2/releases";
-const approvalCategoriesPath = "/v2/approval-categories";
+const categoriesPath = "/v2/categories";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
@@ -98,26 +98,27 @@ export async function deleteReleaseWork(id: number) {
   await request<ReleaseRecord>(`${releasesPath}/${id}`, { method: "DELETE" });
 }
 
-export async function fetchApprovalCategories() {
-  return request<ApprovalCategory[]>(approvalCategoriesPath);
+export async function fetchCategories(scope?: string) {
+  const categories = await request<Category[]>(categoriesPath);
+  return scope ? categories.filter((category) => category.scope === scope) : categories;
 }
 
-export async function createApprovalCategory(input: Omit<ApprovalCategory, "id">) {
-  return request<ApprovalCategory>(approvalCategoriesPath, {
+export async function createCategory(input: Omit<Category, "id">) {
+  return request<Category>(categoriesPath, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ ...input, id: 0 }),
   });
 }
 
-export async function saveApprovalCategory(category: ApprovalCategory) {
-  return request<ApprovalCategory>(`${approvalCategoriesPath}/${category.id}`, {
+export async function saveCategory(category: Category) {
+  return request<Category>(`${categoriesPath}/${category.id}`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(category),
   });
 }
 
-export async function deleteApprovalCategory(id: number) {
-  await request<ApprovalCategory>(`${approvalCategoriesPath}/${id}`, { method: "DELETE" });
+export async function deleteCategory(id: number) {
+  await request<Category>(`${categoriesPath}/${id}`, { method: "DELETE" });
 }

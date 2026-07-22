@@ -6,9 +6,9 @@ Release Hubは共有APIとしてlight-api-server v2の汎用REST APIを利用す
 
 - API実装: `aion0721/light-api-server` の `v2` タグ
 - 実行時依存パッケージ: 0
-- リソース名: `releases`、`approval-categories`
+- リソース名: `releases`、`categories`
 - ベースURL: ビルド時の `VITE_API_BASE_URL`
-- 永続化: light-api-serverの `DATA_DIR/releases.json`、`DATA_DIR/approval-categories.json`
+- 永続化: light-api-serverの `DATA_DIR/releases.json`、`DATA_DIR/categories.json`
 
 ローカル開発と単体コンテナ用の `server/main.mjs` も同じ主要API契約を実装する。
 
@@ -24,7 +24,7 @@ light-api-serverの設定例:
 
 ```json
 {
-  "resources": ["releases", "approval-categories"],
+  "resources": ["releases", "categories"],
   "cors": {
     "origin": "https://release-hub.example.jp"
   },
@@ -104,15 +104,15 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
 | GET | `/v2/releases/:id` | 1件取得 |
 | PUT | `/v2/releases/:id` | 1件全置換 |
 | DELETE | `/v2/releases/:id` | 親作業と配下明細を削除 |
-| GET | `/v2/approval-categories` | 申請種別一覧取得 |
-| POST | `/v2/approval-categories` | 申請種別作成 |
-| PUT | `/v2/approval-categories/:id` | 申請種別更新 |
-| DELETE | `/v2/approval-categories/:id` | 申請種別削除 |
+| GET | `/v2/categories` | 全scopeのカテゴリ一覧取得 |
+| POST | `/v2/categories` | カテゴリ作成 |
+| PUT | `/v2/categories/:id` | カテゴリ更新 |
+| DELETE | `/v2/categories/:id` | カテゴリ削除 |
 | OPTIONS | 任意 | CORSプリフライト |
 
 light-api-server自体はPATCHとクエリ絞り込みも提供するが、現行Release Hubの画面は使用しない。一覧のSystemID・状態フィルターは取得済みReleaseRecordへSPA側で適用する。
 
-申請種別は汎用リソース`approval-categories`へ `{ id, name, description }` 形式で保存する。Release Hub専用エンドポイントは設けず、light-api-server v2の通常CRUDとして扱う。
+カテゴリは汎用リソース`categories`へ `{ id, scope, name, description }` 形式で保存する。申請種別は`scope=approval`とし、SPAが取得後にscopeで絞り込む。将来は`resource-link`等のscopeを追加できる。Release Hub専用エンドポイントは設けず、light-api-server v2の通常CRUDとして扱う。
 
 ## 6. GET /health
 
@@ -187,19 +187,19 @@ SPAは入力値から空の明細配列を持つReleaseWorkを組み立てて送
 
 削除成功後、SPAは一覧のサマリーから対象IDを除外して一覧画面へ戻る。削除の取消・復元は提供しない。
 
-## 12. GET /v2/approval-categories
+## 12. GET /v2/categories
 
-`ApprovalCategory[]`を取得する。各要素は `{ id, name, description }` 形式で、未登録時は空配列を返す。
+`Category[]`を取得する。各要素は `{ id, scope, name, description }` 形式で、未登録時は空配列を返す。SPAは利用画面に応じてscopeを絞り込む。
 
-## 13. POST /v2/approval-categories
+## 13. POST /v2/categories
 
-申請種別名と任意の説明を新規登録する。IDはlight-api-serverが採番し、正常時は`201 Created`を返す。
+scope、カテゴリ名、任意の説明を新規登録する。IDはlight-api-serverが採番し、正常時は`201 Created`を返す。
 
-## 14. PUT /v2/approval-categories/:id
+## 14. PUT /v2/categories/:id
 
-申請種別名と説明を更新する。URLとbodyのIDは一致させる。
+scope、カテゴリ名、説明を更新する。URLとbodyのIDは一致させる。
 
-## 15. DELETE /v2/approval-categories/:id
+## 15. DELETE /v2/categories/:id
 
 申請種別を削除する。既存ReleaseRecord内の`approvals[].category`は文字列として保持されるため変更しない。
 
@@ -236,5 +236,6 @@ npm run migrate:data
 - light-api-serverが書き込みをリソース単位に直列化する。
 - 一時ファイルを書いた後にrenameで `releases.json`を置換する。
 - 複数プロセスから同じ `DATA_DIR`へ書き込む構成は対象外。
-- バックアップ対象は `DATA_DIR/releases.json` と `DATA_DIR/approval-categories.json`。
+- バックアップ対象は `DATA_DIR/releases.json` と `DATA_DIR/categories.json`。
+- ローカル互換APIは旧`approval-categories.json`しか存在しない場合、各要素へ`scope=approval`を付けて`categories.json`を初回生成する。
 - Release Hub専用の検証・集計ロジックはAPIサーバへ追加しない。

@@ -170,7 +170,8 @@ npm test
 | API-010 | DELETE `/v2/releases/:id` | 200で削除し、以降のGETと再DELETEは404 |
 | API-011 | 1,000,000バイトを超えるボディ | 413とサイズ超過エラー |
 | API-012 | CORS設定ありのOPTIONS | 200と許可ヘッダー |
-| API-013 | GET/POST/PUT/DELETE `/v2/approval-categories` | 申請種別を一覧・作成・更新・削除できる |
+| API-013 | GET/POST/PUT/DELETE `/v2/categories` | 異なるscopeのカテゴリを一覧・作成・更新・削除できる |
+| API-014 | 旧`approval-categories.json`で起動 | 各要素へ`scope=approval`を付けて`categories.json`へ移行する |
 
 ## 8. データ移行試験
 

@@ -218,11 +218,12 @@ erDiagram
 | `status` | enum | Yes | 未申請／申請中／回付済／結了済 |
 | `url` | string | No | 申請先リンク。未登録は空文字 |
 
-### 5.6 ApprovalCategory
+### 5.6 Category
 
 | フィールド | 型 | 必須 | 内容 |
 | --- | --- | --- | --- |
 | `id` | number | Yes | 申請種別ID |
+| `scope` | string | Yes | 利用領域。申請種別は`approval` |
 | `name` | string | Yes | 申請種別名 |
 | `description` | string | No | 利用目的・補足。未設定は空文字 |
 
@@ -239,7 +240,8 @@ erDiagram
 ## 6. 共有API・永続化設計
 
 - API詳細は [API仕様書](api-spec.md) を参照する。
-- データファイルはlight-api-serverの `DATA_DIR/releases.json` と `DATA_DIR/approval-categories.json`。
+- データファイルはlight-api-serverの `DATA_DIR/releases.json` と `DATA_DIR/categories.json`。
+- カテゴリは汎用`Category`として保存し、画面ごとに`scope`で絞り込む。旧`approval-categories.json`はローカル互換APIの初回起動時に`scope=approval`を付けて`categories.json`へ移行する。
 - データ形状はトップレベルIDを持つ `ReleaseRecord[]`。
 - 書き込みの直列化と一時ファイル経由のrenameはlight-api-serverが担当する。
 - `src/api.ts`がReleaseRecordと画面用ReleaseWorkを相互変換し、一覧サマリーを計算する。
