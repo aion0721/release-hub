@@ -170,6 +170,11 @@ footer { padding:18px 2px 0; color:#96a0ad; font-size:9px; text-align:right; }
 .delete-confirm-body p { margin:0; color:#66758a; font-size:11px; line-height:1.7; }
 .delete-confirm-modal>.modal-actions { padding:0 24px 24px; }
 .section-kicker.danger { color:#b42336; }
+.copy-work-modal { width:min(560px,100%); }
+.copy-summary { display:grid; gap:5px; padding:13px 14px; border:1px solid #dce7f5; border-radius:8px; background:#f5f9ff; }
+.copy-summary strong { color:#294d7d; font-size:12px; }
+.copy-summary span { color:#60748d; font-size:9px; font-weight:700; }
+.copy-summary p { margin:4px 0 0; color:#74869a; font-size:9px; line-height:1.6; }
 .preview-body { display:grid; gap:18px; padding:22px 24px 24px; }
 .preview-body dl { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:0; }
 .preview-body dl div { padding:13px 14px; border-radius:8px; background:#f5f8fc; }

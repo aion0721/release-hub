@@ -1,5 +1,5 @@
 import { type CSSProperties, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createReleaseWork, deleteReleaseWork, fetchReleaseSummaries, fetchReleaseWork, saveReleaseWork } from "./api";
+import { createReleaseCopy, createReleaseWork, deleteReleaseWork, fetchReleaseSummaries, fetchReleaseWork, saveReleaseWork } from "./api";
 import { sampleWork } from "./sampleData";
 import type { ApprovalItem, ApprovalStatus, CreateReleaseInput, ReleaseSummary, ReleaseWork, ResourceLink, StaffingAssignment, TimelineItem, TimelinePlan, TimelineStatus } from "./types";
 
@@ -47,10 +47,49 @@ function normalizeWork(work: ReleaseWork): ReleaseWork {
   };
 }
 
+type HistoryMode = "push" | "replace" | "none";
+
+function releaseIdFromUrl() {
+  const value = new URL(window.location.href).searchParams.get("release");
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function updateReleaseUrl(id: number | null, mode: Exclude<HistoryMode, "none">) {
+  const url = new URL(window.location.href);
+  if (id === null) url.searchParams.delete("release");
+  else url.searchParams.set("release", String(id));
+  window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
+}
+
+function shiftDate(value: string, days: number) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return value;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + days));
+  return date.toISOString().slice(0, 10);
+}
+
+function buildReleaseCopy(source: ReleaseWork, input: CreateReleaseInput): ReleaseWork {
+  const sourceDay = Date.parse(`${source.release.releaseDate.slice(0, 10)}T00:00:00Z`);
+  const targetDay = Date.parse(`${input.releaseDate.slice(0, 10)}T00:00:00Z`);
+  const dayDelta = Number.isFinite(sourceDay) && Number.isFinite(targetDay) ? Math.round((targetDay - sourceDay) / 86_400_000) : 0;
+  const minuteDelta = toMinutes(input.releaseDate.replace(" ", "T")) - toMinutes(source.release.releaseDate.replace(" ", "T"));
+  const shiftDateTime = (value: string) => value ? fromMinutes(toMinutes(value) + minuteDelta) : "";
+  return {
+    release: { id: 0, ...input, status: "準備中", updatedBy: input.manager, updatedAt: new Date().toISOString() },
+    timeline: source.timeline.map((item) => ({ ...item, startAt: shiftDateTime(item.startAt), endAt: shiftDateTime(item.endAt), actualStartAt: "", actualEndAt: "", status: "未着手" })),
+    staffing: source.staffing.map((item) => ({ ...item, startAt: shiftDateTime(item.startAt), endAt: shiftDateTime(item.endAt) })),
+    approvals: source.approvals.map((item) => ({ ...item, due: shiftDate(item.due, dayDelta), status: "未申請", url: "" })),
+    links: source.links.map((item) => ({ ...item })),
+  };
+}
+
 export default function App() {
   const [showSplash, setShowSplash] = useState(() => sessionStorage.getItem("release-hub-splash-seen") !== "1");
   const [summaries, setSummaries] = useState<ReleaseSummary[]>([toSummary(sampleWork)]);
   const [demoWorks, setDemoWorks] = useState<ReleaseWork[]>([sampleWork]);
+  const demoWorksRef = useRef(demoWorks);
+  demoWorksRef.current = demoWorks;
   const [selected, setSelected] = useState<ReleaseWork | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,6 +98,7 @@ export default function App() {
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [preview, setPreview] = useState<PreviewItem | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
 
   const loadSummaries = useCallback(async () => {
     setLoading(true);
@@ -81,6 +121,17 @@ export default function App() {
   }, [loadSummaries]);
 
   useEffect(() => {
+    const showFromUrl = () => {
+      const id = releaseIdFromUrl();
+      if (id === null) setSelected(null);
+      else void openWork(id, "none");
+    };
+    showFromUrl();
+    window.addEventListener("popstate", showFromUrl);
+    return () => window.removeEventListener("popstate", showFromUrl);
+  }, []);
+
+  useEffect(() => {
     if (!showSplash) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const timer = window.setTimeout(() => {
@@ -90,26 +141,37 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [showSplash]);
 
-  async function openWork(id: number) {
+  async function openWork(id: number, historyMode: HistoryMode = "push") {
     setLoading(true);
     if (demoMode) {
-      const work = demoWorks.find((item) => item.release.id === id);
+      const work = demoWorksRef.current.find((item) => item.release.id === id);
       setSelected(work ? normalizeWork(work) : null);
-      setError("");
+      setError(work ? "" : "共有URLの作業が見つかりません");
+      if (work && historyMode !== "none") updateReleaseUrl(id, historyMode);
       setLoading(false);
       window.scrollTo({ top: 0 });
       return;
     }
     try {
       setSelected(normalizeWork(await fetchReleaseWork(id)));
+      if (historyMode !== "none") updateReleaseUrl(id, historyMode);
       setError("");
       window.scrollTo({ top: 0 });
     } catch (reason) {
-      if (id === sampleWork.release.id) setSelected(sampleWork);
+      if (id === sampleWork.release.id) {
+        setSelected(sampleWork);
+        if (historyMode !== "none") updateReleaseUrl(id, historyMode);
+      }
       setError(reason instanceof Error ? reason.message : "作業を読み込めませんでした");
     } finally {
       setLoading(false);
     }
+  }
+
+  function showList(historyMode: HistoryMode = "push") {
+    setSelected(null);
+    if (historyMode !== "none") updateReleaseUrl(null, historyMode);
+    window.scrollTo({ top: 0 });
   }
 
   async function commit(nextWork: ReleaseWork) {
@@ -146,7 +208,7 @@ export default function App() {
     if (demoMode) {
       setDemoWorks((current) => current.filter((work) => work.release.id !== id));
       setSummaries((current) => current.filter((summary) => summary.id !== id));
-      setSelected(null);
+      showList("replace");
       setDeleteConfirmOpen(false);
       setError("");
       return;
@@ -155,7 +217,7 @@ export default function App() {
     try {
       await deleteReleaseWork(id);
       setSummaries((current) => current.filter((summary) => summary.id !== id));
-      setSelected(null);
+      showList("replace");
       setDeleteConfirmOpen(false);
       setError("");
     } catch (reason) {
@@ -213,6 +275,47 @@ export default function App() {
     void commit({ ...selected, staffing });
   }
 
+  async function submitCopy(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected) return;
+    const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+    const input: CreateReleaseInput = {
+      systemId: String(values.systemId),
+      name: String(values.name),
+      version: String(values.version),
+      releaseDate: String(values.releaseDate).replace("T", " "),
+      environment: String(values.environment),
+      manager: String(values.manager),
+    };
+    const draft = buildReleaseCopy(selected, input);
+    if (demoMode) {
+      const id = demoWorks.reduce((largest, work) => Math.max(largest, work.release.id), 0) + 1;
+      const created = { ...draft, release: { ...draft.release, id, updatedBy: "GitHub Pages Demo" } };
+      setDemoWorks((current) => [created, ...current]);
+      setSummaries((current) => [toSummary(created), ...current]);
+      setSelected(created);
+      setCopyOpen(false);
+      updateReleaseUrl(id, "push");
+      setError("");
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = normalizeWork(await createReleaseCopy(draft));
+      setSummaries((current) => [toSummary(created), ...current]);
+      setSelected(created);
+      setCopyOpen(false);
+      updateReleaseUrl(created.release.id, "push");
+      setError("");
+      window.scrollTo({ top: 0 });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "作業をコピーできませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function submitItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!modal) return;
@@ -251,6 +354,7 @@ export default function App() {
         setDemoWorks((current) => [created, ...current]);
         setSummaries((current) => [toSummary(created), ...current]);
         setSelected(created);
+        updateReleaseUrl(id, "push");
         closeModal();
         setError("");
         return;
@@ -260,6 +364,7 @@ export default function App() {
         const created = await createReleaseWork(input);
         setSummaries((current) => [toSummary(created), ...current]);
         setSelected(created);
+        updateReleaseUrl(created.release.id, "push");
         closeModal();
         setError("");
       } catch (reason) {
@@ -312,17 +417,18 @@ export default function App() {
   return (
     <main className="app-shell">
       {showSplash && <div className="splash-screen" role="status" aria-label="Release Hubを起動しています"><img src={`${import.meta.env.BASE_URL}release-hub-splash.png`} alt="Release Hub リリース情報を、ひとつに。" /></div>}
-      <Sidebar detailOpen={Boolean(selected)} onShowList={() => setSelected(null)} />
+      <Sidebar detailOpen={Boolean(selected)} onShowList={() => showList()} />
       <section className="content">
         {error && <div className="error-banner">{error} — API起動前はサンプルデータを表示します</div>}
         {selected ? (
-          <WorkDetail work={selected} loading={loading} saving={saving} onBack={() => setSelected(null)} onDelete={() => setDeleteConfirmOpen(true)} onOpenModal={openModal} onOpenEditor={openEditor} onOpenPreview={setPreview} onReorderTimeline={reorderTimeline} onUpdateTimelineTime={updateTimelineTime} onUpdateStaffingTime={updateStaffingTime} />
+          <WorkDetail work={selected} loading={loading} saving={saving} onBack={() => showList()} onCopy={() => setCopyOpen(true)} onDelete={() => setDeleteConfirmOpen(true)} onOpenModal={openModal} onOpenEditor={openEditor} onOpenPreview={setPreview} onReorderTimeline={reorderTimeline} onUpdateTimelineTime={updateTimelineTime} onUpdateStaffingTime={updateStaffingTime} />
         ) : (
           <WorkList summaries={summaries} loading={loading} onCreate={() => openModal("work")} onRefresh={() => void loadSummaries()} onOpen={openWork} />
         )}
       </section>
       {modal && <ItemModal type={modal} editTarget={editTarget} releaseDate={selected?.release.releaseDate} saving={saving} onClose={closeModal} onSubmit={submitItem} />}
       {preview && <PreviewModal preview={preview} onClose={() => setPreview(null)} onEdit={(target) => openEditor(target)} />}
+      {copyOpen && selected && <CopyWorkModal work={selected} saving={saving} onClose={() => setCopyOpen(false)} onSubmit={submitCopy} />}
       {deleteConfirmOpen && selected && <DeleteConfirmModal work={selected} saving={saving} onClose={() => setDeleteConfirmOpen(false)} onConfirm={() => void deleteSelectedWork()} />}
     </main>
   );
@@ -392,13 +498,25 @@ function WorkList({ summaries, loading, onCreate, onRefresh, onOpen }: { summari
   </>;
 }
 
-function WorkDetail({ work, loading, saving, onBack, onDelete, onOpenModal, onOpenEditor, onOpenPreview, onReorderTimeline, onUpdateTimelineTime, onUpdateStaffingTime }: { work: ReleaseWork; loading: boolean; saving: boolean; onBack: () => void; onDelete: () => void; onOpenModal: (type: ModalType) => void; onOpenEditor: (target: EditTarget) => void; onOpenPreview: (preview: PreviewItem) => void; onReorderTimeline: (sourceId: number, targetId: number | null, targetPlan: TimelinePlan) => void; onUpdateTimelineTime: (id: number, startAt: string, endAt: string) => void; onUpdateStaffingTime: (id: number, startAt: string, endAt: string) => void }) {
+function WorkDetail({ work, loading, saving, onBack, onCopy, onDelete, onOpenModal, onOpenEditor, onOpenPreview, onReorderTimeline, onUpdateTimelineTime, onUpdateStaffingTime }: { work: ReleaseWork; loading: boolean; saving: boolean; onBack: () => void; onCopy: () => void; onDelete: () => void; onOpenModal: (type: ModalType) => void; onOpenEditor: (target: EditTarget) => void; onOpenPreview: (preview: PreviewItem) => void; onReorderTimeline: (sourceId: number, targetId: number | null, targetPlan: TimelinePlan) => void; onUpdateTimelineTime: (id: number, startAt: string, endAt: string) => void; onUpdateStaffingTime: (id: number, startAt: string, endAt: string) => void }) {
   const [timelineView, setTimelineView] = useState<"list" | "gantt">("list");
+  const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   const progress = useMemo(() => work.timeline.length ? Math.round((work.timeline.filter((item) => item.status === "完了").length / work.timeline.length) * 100) : 0, [work.timeline]);
   const completed = work.timeline.filter((item) => item.status === "完了").length;
   const approved = work.approvals.filter((item) => item.status === "結了済").length;
+  async function copyShareUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("release", String(work.release.id));
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      setShareState("copied");
+      window.setTimeout(() => setShareState("idle"), 2_000);
+    } catch {
+      setShareState("failed");
+    }
+  }
   return <>
-    <header className="topbar"><div><button className="back-button" onClick={onBack}>‹ 作業一覧</button><span className="eyebrow">RELEASE CONTROL CENTER</span><h1>{work.release.name}</h1></div><div className="top-actions"><span className={`live-dot ${saving ? "saving" : ""}`} /><span>{saving ? "保存中" : "共有済み"}</span><button className="danger-button" onClick={onDelete} disabled={loading || saving}>作業を削除</button><button className="ghost-button" onClick={() => onOpenEditor({ type: "work", item: work.release })}>作業情報を編集</button><button className="primary-button" onClick={() => onOpenModal("timeline")}>＋ 作業明細を追加</button></div></header>
+    <header className="topbar"><div><button className="back-button" onClick={onBack}>‹ 作業一覧</button><span className="eyebrow">RELEASE CONTROL CENTER</span><h1>{work.release.name}</h1></div><div className="top-actions"><span className={`live-dot ${saving ? "saving" : ""}`} /><span>{saving ? "保存中" : "共有済み"}</span><button className="ghost-button" onClick={() => void copyShareUrl()}>↗ {shareState === "copied" ? "URLをコピーしました" : shareState === "failed" ? "コピーできませんでした" : "共有URLをコピー"}</button><button className="ghost-button" onClick={onCopy} disabled={loading || saving}>⧉ 作業をコピー</button><button className="danger-button" onClick={onDelete} disabled={loading || saving}>作業を削除</button><button className="ghost-button" onClick={() => onOpenEditor({ type: "work", item: work.release })}>作業情報を編集</button><button className="primary-button" onClick={() => onOpenModal("timeline")}>＋ 作業明細を追加</button></div></header>
     <div id="overview" className="release-banner"><div className="release-main"><span className="status-pill">{work.release.status}</span><h2>{work.release.version || "バージョン未設定"}</h2><p><span className="system-id-badge">{work.release.systemId}</span>{work.release.environment} 環境</p></div><div className="release-meta"><div><span>実施日時</span><strong>{work.release.releaseDate}</strong></div><div><span>責任者</span><strong>{work.release.manager}</strong></div><div><span>作業進捗</span><strong>{progress}%</strong></div><div className="progress-track"><i style={{ width: `${progress}%` }} /></div></div></div>
     <div className="summary-grid"><article className="metric-card"><span className="metric-icon blue">◷</span><div><small>作業項目</small><strong>{work.timeline.length}</strong><em>件</em></div><p>{completed}件 完了</p></article><article className="metric-card"><span className="metric-icon purple">♙</span><div><small>当日体制</small><strong>{work.staffing.length}</strong><em>名</em></div><p>対応メンバー</p></article><article className="metric-card"><span className="metric-icon green">✓</span><div><small>申請・承認</small><strong>{approved}</strong><em>/{work.approvals.length}</em></div><p>結了済み</p></article><article className="metric-card"><span className="metric-icon amber">↗</span><div><small>関連資料</small><strong>{work.links.length}</strong><em>件</em></div><p>すぐにアクセス</p></article></div>
     <div className="workspace-grid"><section id="timeline" className={`panel timeline-panel ${timelineView === "gantt" ? "gantt-panel" : ""}`}><div className="panel-heading"><div><span className="section-kicker">ALL-IN-ONE</span><h2>当日オペレーション</h2><p className="timeline-drag-hint">{timelineView === "list" ? "作業と当日体制を一覧で編集。作業行は上下にドラッグ可能" : "作業と当日体制を同じ時間軸で表示。各バーは5分単位でドラッグ変更"}</p></div><div className="panel-actions"><div className="view-switch" aria-label="オールインワン表示"><button className={timelineView === "list" ? "active" : ""} onClick={() => setTimelineView("list")} aria-pressed={timelineView === "list"}>☷ リスト</button><button className={timelineView === "gantt" ? "active" : ""} onClick={() => setTimelineView("gantt")} aria-pressed={timelineView === "gantt"}>▥ ガント</button></div><button className="staffing-button" onClick={() => onOpenModal("staffing")}>＋ 体制を追加</button><button className="primary-button compact-button" onClick={() => onOpenModal("timeline")}>＋ 作業</button></div></div>{timelineView === "list" ? <AllInOneList items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEditTimeline={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} onReorder={onReorderTimeline} /> : <GanttChart items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEdit={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} onTimeChange={onUpdateTimelineTime} onStaffingTimeChange={onUpdateStaffingTime} />}</section>
@@ -598,6 +716,18 @@ function setPlannedDuration(button: HTMLButtonElement, minutes: number) {
   endDateInput.value = endAt.slice(0, 10);
   endTimeInput.value = endAt.slice(11, 16);
   endTimeInput.focus();
+}
+
+function CopyWorkModal({ work, saving, onClose, onSubmit }: { work: ReleaseWork; saving: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  const detailCount = work.timeline.length + work.staffing.length + work.approvals.length + work.links.length;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><div className="modal copy-work-modal" role="dialog" aria-modal="true" aria-labelledby="copy-work-title" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="section-kicker">COPY RELEASE WORK</span><h2 id="copy-work-title">作業をコピー</h2></div><button onClick={onClose} aria-label="閉じる" disabled={saving}>×</button></div><form onSubmit={onSubmit}>
+    <div className="field-row"><label>SystemID<input name="systemId" defaultValue={work.release.systemId} required /></label><label>作業名<input name="name" defaultValue={`${work.release.name}（コピー）`} required autoFocus /></label></div>
+    <div className="field-row"><label>バージョン（任意）<input name="version" defaultValue={work.release.version} /></label><label>環境<select name="environment" defaultValue={work.release.environment}><option>Production</option><option>Staging</option><option>Development</option></select></label></div>
+    <label>新しい作業日時<input name="releaseDate" type="datetime-local" defaultValue={work.release.releaseDate.replace(" ", "T")} required /></label>
+    <label>責任者<input name="manager" defaultValue={work.release.manager} required /></label>
+    <div className="copy-summary"><strong>{detailCount}件の明細をコピー</strong><span>作業工程 {work.timeline.length}件・当日体制 {work.staffing.length}件・申請物 {work.approvals.length}件・関連リンク {work.links.length}件</span><p>予定日時と期限は新しい作業日に合わせて移動します。作業実績・進捗・申請状態は初期化し、申請リンクは空欄にします。</p></div>
+    <div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose} disabled={saving}>キャンセル</button><button type="submit" className="primary-button" disabled={saving}>{saving ? "コピー中" : "コピーを作成"}</button></div>
+  </form></div></div>;
 }
 
 function DeleteConfirmModal({ work, saving, onClose, onConfirm }: { work: ReleaseWork; saving: boolean; onClose: () => void; onConfirm: () => void }) {

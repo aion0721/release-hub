@@ -72,10 +72,14 @@ export async function createReleaseWork(input: CreateReleaseInput) {
     approvals: [],
     links: [],
   };
+  return createReleaseCopy(draft);
+}
+
+export async function createReleaseCopy(draft: ReleaseWork) {
   const created = await request<ReleaseRecord>(releasesPath, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(draft),
+    body: JSON.stringify({ ...draft, release: { ...draft.release, id: 0 } }),
   });
   return workFromRecord(created);
 }
