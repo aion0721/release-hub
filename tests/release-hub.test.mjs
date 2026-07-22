@@ -67,12 +67,13 @@ async function patchRelease(baseUrl, id, patch) {
 }
 
 test("SPA contains editable release-operation controls", async () => {
-  const [app, apiClient, html] = await Promise.all([
+  const [app, apiClient, html, styles] = await Promise.all([
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/api.ts", import.meta.url), "utf8"),
     readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
   ]);
-  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "一覧を更新", "作業一覧へ戻る", "この作業", "共有URLをコピー", "URLをコピーしました", "作業をコピー", "コピーを作成", "明細をコピー", "プロジェクト番号（任意）", "プロジェクト番号未設定", "作業をグループ化", "グループなし", "SystemIDで絞り込み", "作業状態で絞り込み", "未完了", "作業を削除", "この操作は取り消せません", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "＋ 体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "作業タイトル", "内容（任意）", "紐づける申請物（任意）", "申請物一覧へ申請", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "未申請", "申請中", "回付済", "結了済", "申請リンク（任意）", "手順書・関連リンク", "リンク情報を編集", "URL（任意）", "情報を編集", "リンク未登録", "備考（任意）", "この明細を削除", "そのまま開く", "クリップボードからペースト", "URLエンコード", "当日作業の開始から8時間", "当日体制から選択または入力", "種別", "入力内容を保存できません", "▶ 開始", "✓ 完了", "申請種別管理", "申請種別を追加", "認証・権限制御なし", "自由入力対応", "申請種別（任意）", "候補から選択または手入力"]) {
+  for (const label of ["タイムチャート", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "一覧を更新", "作業一覧へ戻る", "この作業", "共有URLをコピー", "URLをコピーしました", "作業をコピー", "コピーを作成", "明細をコピー", "プロジェクト番号（任意）", "プロジェクト番号未設定", "作業をグループ化", "グループなし", "SystemIDを入力または候補から絞り込み", "プロジェクト番号を入力または候補から絞り込み", "作業状態で絞り込み", "未完了", "作業を削除", "この操作は取り消せません", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "＋ 体制", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "作業タイトル", "内容（任意）", "紐づける申請物（任意）", "紐づける手順書・関連リンク（任意）", "申請物一覧へ申請", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "明細を表示", "申請物一覧", "申請物を編集", "未申請", "申請中", "回付済", "結了済", "申請リンク（任意）", "手順書・関連リンク", "リンク情報を編集", "URL（任意）", "情報を編集", "リンク未登録", "備考（任意）", "この明細を削除", "そのまま開く", "クリップボードからペースト", "URLエンコード", "当日作業の開始から8時間", "当日体制から選択または入力", "種別", "入力内容を保存できません", "▶ 開始", "✓ 完了", "申請種別管理", "申請種別を追加", "認証・権限制御なし", "自由入力対応", "申請種別（任意）", "候補から選択または手入力"]) {
     assert.match(app, new RegExp(label));
   }
   assert.match(app, /PreviewModal/);
@@ -115,6 +116,10 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(app, /role="alert"/);
   assert.match(app, /updateTimelineStatus/);
   assert.match(app, /name="approvalId"/);
+  assert.match(app, /name="resourceLinkId"/);
+  assert.match(app, /list="system-filter-options"/);
+  assert.match(app, /list="project-filter-options"/);
+  assert.match(app, /onOpenPreview\(\{ type: "timeline", item \}\)/);
   assert.match(app, /content: String\(values\.content/);
   const detailHeaderSource = app.slice(app.indexOf('function WorkDetail'), app.indexOf('<div id="overview"'));
   assert.match(detailHeaderSource, /loading \? "更新中" : "更新"/);
@@ -140,6 +145,8 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(apiClient, /APIサーバーのresourcesにcategoriesを追加してください/);
   assert.doesNotMatch(apiClient, /JSON\.stringify\(\{ \.\.\.input, id: 0 \}\)/);
   assert.match(html, /Release Hub \| リリース情報をひとつに/);
+  assert.match(styles, /\.gantt-corner \{ position:sticky; top:0/);
+  assert.match(styles, /\.gantt-axis \{ min-height:48px; position:sticky; top:0/);
 });
 
 test("partial release updates preserve timeline and other detail arrays", async (context) => {
@@ -247,7 +254,7 @@ test("v2-compatible local API persists release records and work edits", async (c
 
   const created = await createRelease(baseUrl);
   created.timeline = [
-    { id: 1, startAt: "2026-08-01T22:00", endAt: "2026-08-01T22:30", actualStartAt: "2026-08-01T22:05", actualEndAt: "2026-08-01T22:42", title: "本番デプロイ", owner: "山田", status: "完了", plan: "本線" },
+    { id: 1, startAt: "2026-08-01T22:00", endAt: "2026-08-01T22:30", actualStartAt: "2026-08-01T22:05", actualEndAt: "2026-08-01T22:42", title: "本番デプロイ", owner: "山田", status: "完了", plan: "本線", kind: "作業", resourceLinkId: 1 },
     { id: 2, startAt: "2026-08-01T22:30", endAt: "2026-08-01T23:00", title: "切り戻し判定", content: "申請の回付状態を確認", owner: "佐藤", status: "未着手", plan: "コンチプラン", kind: "申請物", approvalId: 1 },
   ];
   created.staffing = [{ id: 1, name: "佐藤", phone: "090-1111-2222", startAt: "2026-08-01T21:00", endAt: "2026-08-02T01:00", location: "オンコール", note: "一次連絡先" }];
@@ -280,6 +287,7 @@ test("v2-compatible local API persists release records and work edits", async (c
   assert.equal(reloaded.body.timeline[0].approvalId, 1);
   assert.equal(reloaded.body.timeline[1].actualStartAt, "2026-08-01T22:05");
   assert.equal(reloaded.body.timeline[1].actualEndAt, "2026-08-01T22:42");
+  assert.equal(reloaded.body.timeline[1].resourceLinkId, 1);
   assert.equal(reloaded.body.staffing[0].phone, "090-3333-4444");
   assert.equal(reloaded.body.approvals[0].title, "本番変更申請（更新）");
   assert.equal(reloaded.body.approvals[0].status, "結了済");

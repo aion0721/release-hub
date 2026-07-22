@@ -93,6 +93,7 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
 - `timeline.kind`は「作業」または「申請物」。旧データで未設定の場合はSPAとローカル互換APIが「作業」として扱う。
 - `timeline.title`は作業タイトル、`timeline.content`は任意入力の内容で、旧データのcontent未設定は空文字として扱う。
 - `timeline.approvalId`はkindが「申請物」の場合だけ保持する任意の申請物IDで、未選択またはkindが「作業」の場合は省略する。
+- `timeline.resourceLinkId`はkindが「作業」の場合だけ保持する任意の手順書・関連リンクIDで、未選択またはkindが「申請物」の場合は省略する。
 - 申請リンクと関連リンクのURLは任意で、未登録時は空文字を保存する。
 - `approvals[].note`と`links[].note`は任意の備考で、旧データの未設定時は空文字として扱う。
 - 申請状態は未申請／申請中／回付済／結了済。旧「承認済み」はSPAで「結了済」へ読み替える。
@@ -114,7 +115,7 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
 | DELETE | `/v2/categories/:id` | カテゴリ削除 |
 | OPTIONS | 任意 | CORSプリフライト |
 
-Release Hubの画面は明細保存にPATCHを使用する。一覧のSystemID・状態フィルターは取得済みReleaseRecordへSPA側で適用する。
+Release Hubの画面は明細保存にPATCHを使用する。一覧のSystemID・プロジェクト番号・状態フィルターは取得済みReleaseRecordへSPA側で適用する。
 
 カテゴリは汎用リソース`categories`へ `{ id, scope, name, description }` 形式で保存する。申請種別は`scope=approval`とし、SPAが取得後にscopeで絞り込む。将来は`resource-link`等のscopeを追加できる。Release Hub専用エンドポイントは設けず、light-api-server v2の通常CRUDとして扱う。
 

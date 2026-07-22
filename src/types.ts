@@ -16,6 +16,7 @@ export type TimelineItem = {
   plan: TimelinePlan;
   kind?: TimelineKind;
   approvalId?: number;
+  resourceLinkId?: number;
 };
 
 export type ApprovalItem = {

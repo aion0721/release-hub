@@ -126,6 +126,8 @@ function normalizeTimeline(work) {
     item.content ||= "";
     if (item.kind === "申請物" && Number.isInteger(Number(item.approvalId)) && Number(item.approvalId) > 0) item.approvalId = Number(item.approvalId);
     else delete item.approvalId;
+    if (item.kind === "作業" && Number.isInteger(Number(item.resourceLinkId)) && Number(item.resourceLinkId) > 0) item.resourceLinkId = Number(item.resourceLinkId);
+    else delete item.resourceLinkId;
     if (!item.startAt) {
       const startMinutes = timeMinutes(item.time);
       if (previousMinutes !== null && startMinutes < previousMinutes) dayOffset += 1;
