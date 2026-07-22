@@ -6,9 +6,9 @@ Release Hubは共有APIとしてlight-api-server v2の汎用REST APIを利用す
 
 - API実装: `aion0721/light-api-server` の `v2` タグ
 - 実行時依存パッケージ: 0
-- リソース名: `releases`
+- リソース名: `releases`、`approval-categories`
 - ベースURL: ビルド時の `VITE_API_BASE_URL`
-- 永続化: light-api-serverの `DATA_DIR/releases.json`
+- 永続化: light-api-serverの `DATA_DIR/releases.json`、`DATA_DIR/approval-categories.json`
 
 ローカル開発と単体コンテナ用の `server/main.mjs` も同じ主要API契約を実装する。
 
@@ -24,7 +24,7 @@ light-api-serverの設定例:
 
 ```json
 {
-  "resources": ["releases"],
+  "resources": ["releases", "approval-categories"],
   "cors": {
     "origin": "https://release-hub.example.jp"
   },
@@ -104,9 +104,15 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
 | GET | `/v2/releases/:id` | 1件取得 |
 | PUT | `/v2/releases/:id` | 1件全置換 |
 | DELETE | `/v2/releases/:id` | 親作業と配下明細を削除 |
+| GET | `/v2/approval-categories` | 申請種別一覧取得 |
+| POST | `/v2/approval-categories` | 申請種別作成 |
+| PUT | `/v2/approval-categories/:id` | 申請種別更新 |
+| DELETE | `/v2/approval-categories/:id` | 申請種別削除 |
 | OPTIONS | 任意 | CORSプリフライト |
 
 light-api-server自体はPATCHとクエリ絞り込みも提供するが、現行Release Hubの画面は使用しない。一覧のSystemID・状態フィルターは取得済みReleaseRecordへSPA側で適用する。
+
+申請種別は汎用リソース`approval-categories`へ `{ id, name, description }` 形式で保存する。Release Hub専用エンドポイントは設けず、light-api-server v2の通常CRUDとして扱う。
 
 ## 6. GET /health
 
@@ -181,7 +187,23 @@ SPAは入力値から空の明細配列を持つReleaseWorkを組み立てて送
 
 削除成功後、SPAは一覧のサマリーから対象IDを除外して一覧画面へ戻る。削除の取消・復元は提供しない。
 
-## 12. エラー処理
+## 12. GET /v2/approval-categories
+
+`ApprovalCategory[]`を取得する。各要素は `{ id, name, description }` 形式で、未登録時は空配列を返す。
+
+## 13. POST /v2/approval-categories
+
+申請種別名と任意の説明を新規登録する。IDはlight-api-serverが採番し、正常時は`201 Created`を返す。
+
+## 14. PUT /v2/approval-categories/:id
+
+申請種別名と説明を更新する。URLとbodyのIDは一致させる。
+
+## 15. DELETE /v2/approval-categories/:id
+
+申請種別を削除する。既存ReleaseRecord内の`approvals[].category`は文字列として保持されるため変更しない。
+
+## 16. エラー処理
 
 light-api-serverのv2エラーは次の形式で返る。
 
@@ -191,7 +213,7 @@ light-api-serverのv2エラーは次の形式で返る。
 
 SPAは404を「対象の作業が見つかりません」、その他を「共有データを処理できませんでした」へ変換し、楽観更新に失敗した場合は直前の画面状態へ戻す。
 
-## 13. データ移行
+## 17. データ移行
 
 旧形式は `DATA_DIR/release.json` の `{ "releases": ReleaseWork[] }` である。次のコマンドで `DATA_DIR/releases.json` のReleaseRecord配列へ変換する。
 
@@ -209,10 +231,10 @@ npm run migrate:data
 
 既存の `releases.json` は上書きしない。移行後のファイルをlight-api-serverの `DATA_DIR`へ配置してから起動する。
 
-## 14. 永続化と制約
+## 18. 永続化と制約
 
 - light-api-serverが書き込みをリソース単位に直列化する。
 - 一時ファイルを書いた後にrenameで `releases.json`を置換する。
 - 複数プロセスから同じ `DATA_DIR`へ書き込む構成は対象外。
-- バックアップ対象は `DATA_DIR/releases.json`。
+- バックアップ対象は `DATA_DIR/releases.json` と `DATA_DIR/approval-categories.json`。
 - Release Hub専用の検証・集計ロジックはAPIサーバへ追加しない。

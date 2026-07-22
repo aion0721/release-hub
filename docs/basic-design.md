@@ -212,12 +212,21 @@ erDiagram
 | --- | --- | --- | --- |
 | `id` | number | Yes | 申請物内ID |
 | `title` | string | Yes | 申請名 |
+| `category` | string | No | 申請種別。マスタ候補または自由入力、未設定は空文字 |
 | `owner` | string | Yes | 担当者 |
 | `due` | string | Yes | 期限（`YYYY-MM-DD`） |
 | `status` | enum | Yes | 未申請／申請中／回付済／結了済 |
 | `url` | string | No | 申請先リンク。未登録は空文字 |
 
-### 5.6 ResourceLink
+### 5.6 ApprovalCategory
+
+| フィールド | 型 | 必須 | 内容 |
+| --- | --- | --- | --- |
+| `id` | number | Yes | 申請種別ID |
+| `name` | string | Yes | 申請種別名 |
+| `description` | string | No | 利用目的・補足。未設定は空文字 |
+
+### 5.7 ResourceLink
 
 | フィールド | 型 | 必須 | 内容 |
 | --- | --- | --- | --- |
@@ -230,7 +239,7 @@ erDiagram
 ## 6. 共有API・永続化設計
 
 - API詳細は [API仕様書](api-spec.md) を参照する。
-- データファイルはlight-api-serverの `DATA_DIR/releases.json`。
+- データファイルはlight-api-serverの `DATA_DIR/releases.json` と `DATA_DIR/approval-categories.json`。
 - データ形状はトップレベルIDを持つ `ReleaseRecord[]`。
 - 書き込みの直列化と一時ファイル経由のrenameはlight-api-serverが担当する。
 - `src/api.ts`がReleaseRecordと画面用ReleaseWorkを相互変換し、一覧サマリーを計算する。

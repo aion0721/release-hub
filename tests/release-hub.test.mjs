@@ -63,7 +63,7 @@ test("SPA contains editable release-operation controls", async () => {
     readFile(new URL("../src/api.ts", import.meta.url), "utf8"),
     readFile(new URL("../index.html", import.meta.url), "utf8"),
   ]);
-  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "一覧を更新", "作業一覧へ戻る", "この作業", "共有URLをコピー", "URLをコピーしました", "作業をコピー", "コピーを作成", "明細をコピー", "バージョン（任意）", "バージョン未設定", "SystemIDで絞り込み", "作業状態で絞り込み", "未完了", "作業を削除", "この操作は取り消せません", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "体制を追加", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "未申請", "申請中", "回付済", "結了済", "申請リンク（任意）", "手順書・関連リンク", "リンク情報を編集", "URL（任意）", "情報を編集", "リンクを開く", "リンク未登録", "当日作業の開始から8時間", "当日体制から選択または入力", "種別", "入力内容を保存できません", "▶ 開始", "✓ 完了"]) {
+  for (const label of ["当日オペレーション", "ALL-IN-ONE", "オールインワン表示", "リリース作業", "リリース作業を登録", "一覧を更新", "作業一覧へ戻る", "この作業", "共有URLをコピー", "URLをコピーしました", "作業をコピー", "コピーを作成", "明細をコピー", "バージョン（任意）", "バージョン未設定", "SystemIDで絞り込み", "作業状態で絞り込み", "未完了", "作業を削除", "この操作は取り消せません", "作業カレンダー", "前の月", "次の月", "作業日", "開始時刻", "終了時刻", "開始から", "実績開始日時", "実績終了日時", "今を開始に設定", "今を終了に設定", "作業中は実績開始のみ入力", "実績を編集", "表示範囲外", "ガント", "当日体制", "体制を追加", "対応開始日時", "電話番号", "開始日時", "作業情報を編集", "コンチプラン", "ドラッグして並べ替え", "上下にドラッグ", "5分単位でドラッグ変更", "対応時間帯をドラッグで移動", "対応開始時刻をドラッグで変更", "対応終了時刻をドラッグで変更", "申請物一覧", "申請物を編集", "未申請", "申請中", "回付済", "結了済", "申請リンク（任意）", "手順書・関連リンク", "リンク情報を編集", "URL（任意）", "情報を編集", "リンクを開く", "リンク未登録", "当日作業の開始から8時間", "当日体制から選択または入力", "種別", "入力内容を保存できません", "▶ 開始", "✓ 完了", "申請種別管理", "申請種別を追加", "認証・権限制御なし", "自由入力対応", "申請種別（任意）", "候補から選択または手入力"]) {
     assert.match(app, new RegExp(label));
   }
   assert.match(app, /PreviewModal/);
@@ -97,6 +97,9 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(app, /list="staffing-owner-options"/);
   assert.match(app, /role="alert"/);
   assert.match(app, /updateTimelineStatus/);
+  assert.match(app, /approvalCategoryAdminFromUrl/);
+  assert.match(app, /list="approval-category-options"/);
+  assert.match(app, /sampleApprovalCategories/);
   const timelineModalSource = app.slice(app.indexOf('{type === "timeline"'), app.indexOf('{type === "approval"'));
   assert.ok(timelineModalSource.indexOf('name="title"') < timelineModalSource.indexOf('name="plan"'));
   const previewSource = app.slice(app.indexOf("function PreviewModal"));
@@ -106,6 +109,7 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(apiClient, /summaryFromRecord/);
   assert.match(apiClient, /createReleaseCopy/);
   assert.match(apiClient, /method: "DELETE"/);
+  assert.match(apiClient, /\/v2\/approval-categories/);
   assert.match(html, /Release Hub \| リリース情報をひとつに/);
 });
 
@@ -130,9 +134,9 @@ test("project documentation covers current product, API, design, and acceptance 
     readFile(new URL("../docs/test-spec.md", import.meta.url), "utf8"),
   ]);
   for (const path of ["docs/requirements.md", "docs/basic-design.md", "docs/api-spec.md", "docs/test-spec.md"]) assert.match(readme, new RegExp(path));
-  for (const term of ["SystemID", "コンチプラン", "表示範囲外", "VITE_DEMO_MODE"]) assert.match(requirements, new RegExp(term));
+  for (const term of ["SystemID", "コンチプラン", "表示範囲外", "VITE_DEMO_MODE", "申請種別管理", "approval-categories"]) assert.match(requirements, new RegExp(term));
   for (const term of ["mermaid", "release.json", "GitLab CI", "GitHub Actions"]) assert.match(design, new RegExp(term));
-  for (const endpoint of ["GET /health", "GET /v2/releases", "POST /v2/releases", "PUT /v2/releases/:id"]) assert.match(api, new RegExp(endpoint));
+  for (const endpoint of ["GET /health", "GET /v2/releases", "POST /v2/releases", "PUT /v2/releases/:id", "GET /v2/approval-categories", "POST /v2/approval-categories"]) assert.match(api, new RegExp(endpoint));
   for (const testId of ["FT-020", "FT-046", "API-007", "MIG-006", "NFT-008"]) assert.match(testSpec, new RegExp(testId));
 });
 
@@ -226,6 +230,34 @@ test("v2-compatible local API persists release records and work edits", async (c
   const record = records.body.find((item) => item.id === created.release.id);
   assert.equal(record.release.status, "進行中");
   assert.equal(record.release.systemId, "MEMBER-CORE");
+});
+
+test("v2-compatible local API manages approval categories", async (context) => {
+  const baseUrl = await startServer(context);
+  const initial = await requestJson(`${baseUrl}/v2/approval-categories`);
+  assert.equal(initial.response.status, 200);
+  assert.deepEqual(initial.body.map((category) => category.name), ["資源配布", "WF"]);
+
+  const created = await requestJson(`${baseUrl}/v2/approval-categories`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id: 0, name: "セキュリティ審査", description: "事前確認" }),
+  });
+  assert.equal(created.response.status, 201);
+  assert.equal(created.body.id, 3);
+
+  const updated = await requestJson(`${baseUrl}/v2/approval-categories/${created.body.id}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...created.body, name: "セキュリティ申請", description: "リリース前審査" }),
+  });
+  assert.equal(updated.response.status, 200);
+  assert.equal(updated.body.name, "セキュリティ申請");
+
+  const deleted = await requestJson(`${baseUrl}/v2/approval-categories/${created.body.id}`, { method: "DELETE" });
+  assert.equal(deleted.response.status, 200);
+  assert.equal((await requestJson(`${baseUrl}/v2/approval-categories`)).body.length, 2);
+  assert.equal((await requestJson(`${baseUrl}/v2/approval-categories/${created.body.id}`, { method: "DELETE" })).response.status, 404);
 });
 
 test("v2-compatible local API rejects invalid mutations and reports missing resources", async (context) => {

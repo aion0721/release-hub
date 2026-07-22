@@ -1,8 +1,9 @@
-import type { CreateReleaseInput, ReleaseRecord, ReleaseSummary, ReleaseWork } from "./types";
+import type { ApprovalCategory, CreateReleaseInput, ReleaseRecord, ReleaseSummary, ReleaseWork } from "./types";
 
 const configuredBase = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const apiBase = configuredBase.replace(/\/$/, "");
 const releasesPath = "/v2/releases";
+const approvalCategoriesPath = "/v2/approval-categories";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
@@ -95,4 +96,28 @@ export async function saveReleaseWork(work: ReleaseWork) {
 
 export async function deleteReleaseWork(id: number) {
   await request<ReleaseRecord>(`${releasesPath}/${id}`, { method: "DELETE" });
+}
+
+export async function fetchApprovalCategories() {
+  return request<ApprovalCategory[]>(approvalCategoriesPath);
+}
+
+export async function createApprovalCategory(input: Omit<ApprovalCategory, "id">) {
+  return request<ApprovalCategory>(approvalCategoriesPath, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...input, id: 0 }),
+  });
+}
+
+export async function saveApprovalCategory(category: ApprovalCategory) {
+  return request<ApprovalCategory>(`${approvalCategoriesPath}/${category.id}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(category),
+  });
+}
+
+export async function deleteApprovalCategory(id: number) {
+  await request<ApprovalCategory>(`${approvalCategoriesPath}/${id}`, { method: "DELETE" });
 }

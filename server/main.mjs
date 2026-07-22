@@ -7,8 +7,10 @@ const projectRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const distDir = join(projectRoot, "dist");
 const dataDir = resolve(projectRoot, process.env.DATA_DIR || "data");
 const dataFile = join(dataDir, "releases.json");
+const approvalCategoriesFile = join(dataDir, "approval-categories.json");
 const legacyDataFile = join(dataDir, "release.json");
 const seedFile = join(projectRoot, "server", "seed.json");
+const approvalCategoriesSeedFile = join(projectRoot, "server", "approval-categories.seed.json");
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || "0.0.0.0";
 const corsOrigin = process.env.CORS_ORIGIN || "";
@@ -45,6 +47,21 @@ async function ensureDataFile() {
 async function readDatabase() {
   await ensureDataFile();
   return recordsFromValue(JSON.parse(await readFile(dataFile, "utf8")));
+}
+
+async function ensureApprovalCategoriesFile() {
+  await mkdir(dataDir, { recursive: true });
+  try {
+    await stat(approvalCategoriesFile);
+  } catch {
+    await writeFile(approvalCategoriesFile, await readFile(approvalCategoriesSeedFile, "utf8"), "utf8");
+  }
+}
+
+async function readApprovalCategories() {
+  await ensureApprovalCategoriesFile();
+  const value = JSON.parse(await readFile(approvalCategoriesFile, "utf8"));
+  return Array.isArray(value) ? value.filter((item) => item && typeof item === "object").map((item) => ({ id: Number(item.id), name: String(item.name || ""), description: String(item.description || "") })) : [];
 }
 
 function normalizeRecord(record) {
@@ -137,6 +154,12 @@ async function writeDatabase(records) {
   await rename(temporaryFile, dataFile);
 }
 
+async function writeApprovalCategories(categories) {
+  const temporaryFile = `${approvalCategoriesFile}.${process.pid}.tmp`;
+  await writeFile(temporaryFile, `${JSON.stringify(categories, null, 2)}\n`, "utf8");
+  await rename(temporaryFile, approvalCategoriesFile);
+}
+
 function mutateDatabase(mutator) {
   const operation = writeQueue.then(async () => {
     const records = await readDatabase();
@@ -148,8 +171,23 @@ function mutateDatabase(mutator) {
   return operation;
 }
 
+function mutateApprovalCategories(mutator) {
+  const operation = writeQueue.then(async () => {
+    const categories = await readApprovalCategories();
+    const result = await mutator(categories);
+    await writeApprovalCategories(categories);
+    return result;
+  });
+  writeQueue = operation.then(() => undefined, () => undefined);
+  return operation;
+}
+
 function isReleaseWork(value) {
   return Boolean(value && typeof value === "object" && value.release && Array.isArray(value.timeline) && Array.isArray(value.staffing) && Array.isArray(value.approvals) && Array.isArray(value.links));
+}
+
+function isApprovalCategory(value) {
+  return Boolean(value && typeof value === "object" && String(value.name || "").trim());
 }
 
 async function readBody(request) {
@@ -199,6 +237,7 @@ const server = createServer(async (request, response) => {
   const method = request.method || "GET";
   const pathname = new URL(request.url || "/", "http://localhost").pathname;
   const releaseMatch = pathname.match(/^\/v2\/releases\/(\d+)$/);
+  const approvalCategoryMatch = pathname.match(/^\/v2\/approval-categories\/(\d+)$/);
 
   try {
     if (method === "OPTIONS") { response.writeHead(200); response.end(); return; }
@@ -243,6 +282,45 @@ const server = createServer(async (request, response) => {
         const index = records.findIndex((item) => item.id === id);
         if (index < 0) return null;
         return records.splice(index, 1)[0];
+      });
+      sendJson(response, deleted ? 200 : 404, deleted || { error: "Resource item not found" });
+      return;
+    }
+    if (pathname === "/v2/approval-categories" && method === "GET") {
+      sendJson(response, 200, await readApprovalCategories());
+      return;
+    }
+    if (pathname === "/v2/approval-categories" && method === "POST") {
+      const input = await readBody(request);
+      if (!isApprovalCategory(input)) { sendJson(response, 400, { error: "Invalid approval category data" }); return; }
+      const created = await mutateApprovalCategories((categories) => {
+        const id = categories.reduce((largest, category) => Math.max(largest, Number(category.id) || 0), 0) + 1;
+        const category = { id, name: String(input.name).trim(), description: String(input.description || "").trim() };
+        categories.push(category);
+        return category;
+      });
+      sendJson(response, 201, created);
+      return;
+    }
+    if (approvalCategoryMatch && method === "PUT") {
+      const id = Number(approvalCategoryMatch[1]);
+      const input = await readBody(request);
+      if (!isApprovalCategory(input) || Number(input.id) !== id) { sendJson(response, 400, { error: "Resource id does not match request path" }); return; }
+      const updated = await mutateApprovalCategories((categories) => {
+        const index = categories.findIndex((category) => category.id === id);
+        if (index < 0) return null;
+        categories[index] = { id, name: String(input.name).trim(), description: String(input.description || "").trim() };
+        return categories[index];
+      });
+      sendJson(response, updated ? 200 : 404, updated || { error: "Resource item not found" });
+      return;
+    }
+    if (approvalCategoryMatch && method === "DELETE") {
+      const id = Number(approvalCategoryMatch[1]);
+      const deleted = await mutateApprovalCategories((categories) => {
+        const index = categories.findIndex((category) => category.id === id);
+        if (index < 0) return null;
+        return categories.splice(index, 1)[0];
       });
       sendJson(response, deleted ? 200 : 404, deleted || { error: "Resource item not found" });
       return;

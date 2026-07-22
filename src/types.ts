@@ -19,10 +19,17 @@ export type TimelineItem = {
 export type ApprovalItem = {
   id: number;
   title: string;
+  category?: string;
   owner: string;
   due: string;
   status: ApprovalStatus;
   url: string;
+};
+
+export type ApprovalCategory = {
+  id: number;
+  name: string;
+  description: string;
 };
 
 export type ResourceLink = {

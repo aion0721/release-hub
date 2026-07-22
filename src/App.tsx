@@ -1,12 +1,16 @@
 import { type CSSProperties, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createReleaseCopy, createReleaseWork, deleteReleaseWork, fetchReleaseSummaries, fetchReleaseWork, saveReleaseWork } from "./api";
+import { createApprovalCategory, createReleaseCopy, createReleaseWork, deleteApprovalCategory, deleteReleaseWork, fetchApprovalCategories, fetchReleaseSummaries, fetchReleaseWork, saveApprovalCategory, saveReleaseWork } from "./api";
 import { sampleWork } from "./sampleData";
-import type { ApprovalItem, ApprovalStatus, CreateReleaseInput, ReleaseSummary, ReleaseWork, ResourceLink, StaffingAssignment, TimelineItem, TimelineKind, TimelinePlan, TimelineStatus } from "./types";
+import type { ApprovalCategory, ApprovalItem, ApprovalStatus, CreateReleaseInput, ReleaseSummary, ReleaseWork, ResourceLink, StaffingAssignment, TimelineItem, TimelineKind, TimelinePlan, TimelineStatus } from "./types";
 
 type ModalType = "work" | "staffing" | "timeline" | "approval" | "link";
 type PreviewItem = { type: "approval"; item: ApprovalItem } | { type: "link"; item: ResourceLink };
 type EditTarget = { type: "work"; item: ReleaseWork["release"] } | { type: "staffing"; item: StaffingAssignment } | { type: "timeline"; item: TimelineItem } | { type: "approval"; item: ApprovalItem } | { type: "link"; item: ResourceLink };
 const demoMode = import.meta.env.VITE_DEMO_MODE === "true";
+const sampleApprovalCategories: ApprovalCategory[] = [
+  { id: 1, name: "資源配布", description: "サーバー、ストレージ、アカウントなどの資源配布に関する申請" },
+  { id: 2, name: "WF", description: "社内ワークフローで回付する申請" },
+];
 
 function nextId(items: Array<{ id: number }>) {
   return items.reduce((largest, item) => Math.max(largest, item.id), 0) + 1;
@@ -44,7 +48,7 @@ function normalizeWork(work: ReleaseWork): ReleaseWork {
     ...work,
     release: { ...work.release, systemId: work.release.systemId || "未設定" },
     timeline: (work.timeline || []).map((item) => ({ ...item, kind: item.kind || "作業" })),
-    approvals: (work.approvals || []).map((item) => ({ ...item, due: normalizeDueDate(item.due, work.release.releaseDate), status: normalizeApprovalStatus(item.status) })),
+    approvals: (work.approvals || []).map((item) => ({ ...item, category: item.category || "", due: normalizeDueDate(item.due, work.release.releaseDate), status: normalizeApprovalStatus(item.status) })),
   };
 }
 
@@ -56,10 +60,22 @@ function releaseIdFromUrl() {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
+function approvalCategoryAdminFromUrl() {
+  return new URL(window.location.href).searchParams.get("view") === "approval-categories";
+}
+
 function updateReleaseUrl(id: number | null, mode: Exclude<HistoryMode, "none">) {
   const url = new URL(window.location.href);
+  url.searchParams.delete("view");
   if (id === null) url.searchParams.delete("release");
   else url.searchParams.set("release", String(id));
+  window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
+}
+
+function updateApprovalCategoryAdminUrl(mode: Exclude<HistoryMode, "none">) {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("release");
+  url.searchParams.set("view", "approval-categories");
   window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
 }
 
@@ -92,6 +108,10 @@ export default function App() {
   const demoWorksRef = useRef(demoWorks);
   demoWorksRef.current = demoWorks;
   const [selected, setSelected] = useState<ReleaseWork | null>(null);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [approvalCategories, setApprovalCategories] = useState<ApprovalCategory[]>(sampleApprovalCategories);
+  const [categorySaving, setCategorySaving] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -120,10 +140,17 @@ export default function App() {
 
   useEffect(() => {
     void loadSummaries();
+    if (!demoMode) void fetchApprovalCategories().then((categories) => { setApprovalCategories(categories); setCategoryError(""); }).catch((reason) => setCategoryError(reason instanceof Error ? reason.message : "申請種別を読み込めませんでした"));
   }, [loadSummaries]);
 
   useEffect(() => {
     const showFromUrl = () => {
+      if (approvalCategoryAdminFromUrl()) {
+        setSelected(null);
+        setAdminOpen(true);
+        return;
+      }
+      setAdminOpen(false);
       const id = releaseIdFromUrl();
       if (id === null) setSelected(null);
       else void openWork(id, "none");
@@ -144,6 +171,7 @@ export default function App() {
   }, [showSplash]);
 
   async function openWork(id: number, historyMode: HistoryMode = "push") {
+    setAdminOpen(false);
     setLoading(true);
     if (demoMode) {
       const work = demoWorksRef.current.find((item) => item.release.id === id);
@@ -172,8 +200,88 @@ export default function App() {
 
   function showList(historyMode: HistoryMode = "push") {
     setSelected(null);
+    setAdminOpen(false);
     if (historyMode !== "none") updateReleaseUrl(null, historyMode);
     window.scrollTo({ top: 0 });
+  }
+
+  function showApprovalCategoryAdmin(historyMode: HistoryMode = "push") {
+    setSelected(null);
+    setAdminOpen(true);
+    if (historyMode !== "none") updateApprovalCategoryAdminUrl(historyMode);
+    window.scrollTo({ top: 0 });
+  }
+
+  async function addApprovalCategory(name: string, description: string) {
+    const normalizedName = name.trim();
+    if (approvalCategories.some((category) => category.name.toLocaleLowerCase("ja") === normalizedName.toLocaleLowerCase("ja"))) {
+      setCategoryError("同じ名前の申請種別がすでに登録されています");
+      return false;
+    }
+    if (demoMode) {
+      const id = nextId(approvalCategories);
+      setApprovalCategories((current) => [...current, { id, name: normalizedName, description: description.trim() }]);
+      setCategoryError("");
+      return true;
+    }
+    setCategorySaving(true);
+    try {
+      const created = await createApprovalCategory({ name: normalizedName, description: description.trim() });
+      setApprovalCategories((current) => [...current, created]);
+      setCategoryError("");
+      return true;
+    } catch (reason) {
+      setCategoryError(reason instanceof Error ? reason.message : "申請種別を追加できませんでした");
+      return false;
+    } finally {
+      setCategorySaving(false);
+    }
+  }
+
+  async function updateApprovalCategory(category: ApprovalCategory) {
+    const normalizedName = category.name.trim();
+    if (approvalCategories.some((item) => item.id !== category.id && item.name.toLocaleLowerCase("ja") === normalizedName.toLocaleLowerCase("ja"))) {
+      setCategoryError("同じ名前の申請種別がすでに登録されています");
+      return false;
+    }
+    const nextCategory = { ...category, name: normalizedName, description: category.description.trim() };
+    if (demoMode) {
+      setApprovalCategories((current) => current.map((item) => item.id === category.id ? nextCategory : item));
+      setCategoryError("");
+      return true;
+    }
+    setCategorySaving(true);
+    try {
+      const saved = await saveApprovalCategory(nextCategory);
+      setApprovalCategories((current) => current.map((item) => item.id === saved.id ? saved : item));
+      setCategoryError("");
+      return true;
+    } catch (reason) {
+      setCategoryError(reason instanceof Error ? reason.message : "申請種別を更新できませんでした");
+      return false;
+    } finally {
+      setCategorySaving(false);
+    }
+  }
+
+  async function removeApprovalCategory(id: number) {
+    if (demoMode) {
+      setApprovalCategories((current) => current.filter((category) => category.id !== id));
+      setCategoryError("");
+      return true;
+    }
+    setCategorySaving(true);
+    try {
+      await deleteApprovalCategory(id);
+      setApprovalCategories((current) => current.filter((category) => category.id !== id));
+      setCategoryError("");
+      return true;
+    } catch (reason) {
+      setCategoryError(reason instanceof Error ? reason.message : "申請種別を削除できませんでした");
+      return false;
+    } finally {
+      setCategorySaving(false);
+    }
   }
 
   async function commit(nextWork: ReleaseWork) {
@@ -421,7 +529,7 @@ export default function App() {
       nextWork = { ...selected, timeline: editing ? selected.timeline.map((row) => row.id === editing.id ? item : row) : [...selected.timeline, item] };
     } else if (modal === "approval") {
       const editing = editTarget?.type === "approval" ? editTarget.item : null;
-      const item: ApprovalItem = { id: editing?.id ?? nextId(selected.approvals), title: String(values.title), owner: String(values.owner), due: String(values.due), status: String(values.status || "未申請") as ApprovalItem["status"], url: String(values.url) };
+      const item: ApprovalItem = { id: editing?.id ?? nextId(selected.approvals), title: String(values.title), category: String(values.category || ""), owner: String(values.owner), due: String(values.due), status: String(values.status || "未申請") as ApprovalItem["status"], url: String(values.url) };
       nextWork = { ...selected, approvals: editing ? selected.approvals.map((row) => row.id === editing.id ? item : row) : [...selected.approvals, item] };
     } else {
       const editing = editTarget?.type === "link" ? editTarget.item : null;
@@ -435,16 +543,18 @@ export default function App() {
   return (
     <main className="app-shell">
       {showSplash && <div className="splash-screen" role="status" aria-label="Release Hubを起動しています"><img src={`${import.meta.env.BASE_URL}release-hub-splash.png`} alt="Release Hub リリース情報を、ひとつに。" /></div>}
-      <Sidebar detailOpen={Boolean(selected)} onShowList={() => showList()} />
+      <Sidebar detailOpen={Boolean(selected)} adminOpen={adminOpen} onShowList={() => showList()} onShowAdmin={() => showApprovalCategoryAdmin()} />
       <section className="content">
         {error && <div className="error-banner">{error} — API起動前はサンプルデータを表示します</div>}
-        {selected ? (
+        {adminOpen ? (
+          <ApprovalCategoryAdmin categories={approvalCategories} saving={categorySaving} error={categoryError} onBack={() => showList()} onCreate={addApprovalCategory} onSave={updateApprovalCategory} onDelete={removeApprovalCategory} />
+        ) : selected ? (
           <WorkDetail work={selected} loading={loading} saving={saving} onBack={() => showList()} onCopy={() => setCopyOpen(true)} onDelete={() => setDeleteConfirmOpen(true)} onOpenModal={openModal} onOpenEditor={openEditor} onOpenPreview={setPreview} onReorderTimeline={reorderTimeline} onUpdateTimelineTime={updateTimelineTime} onUpdateStaffingTime={updateStaffingTime} onUpdateTimelineStatus={updateTimelineStatus} />
         ) : (
           <WorkList summaries={summaries} loading={loading} onCreate={() => openModal("work")} onRefresh={() => void loadSummaries()} onOpen={openWork} />
         )}
       </section>
-      {modal && <ItemModal type={modal} editTarget={editTarget} releaseDate={selected?.release.releaseDate} staffing={selected?.staffing || []} formError={formError} saving={saving} onClose={closeModal} onSubmit={submitItem} />}
+      {modal && <ItemModal type={modal} editTarget={editTarget} releaseDate={selected?.release.releaseDate} staffing={selected?.staffing || []} approvalCategories={approvalCategories} formError={formError} saving={saving} onClose={closeModal} onSubmit={submitItem} />}
       {preview && <PreviewModal preview={preview} onClose={() => setPreview(null)} onEdit={(target) => openEditor(target)} />}
       {copyOpen && selected && <CopyWorkModal work={selected} saving={saving} onClose={() => setCopyOpen(false)} onSubmit={submitCopy} />}
       {deleteConfirmOpen && selected && <DeleteConfirmModal work={selected} saving={saving} onClose={() => setDeleteConfirmOpen(false)} onConfirm={() => void deleteSelectedWork()} />}
@@ -452,15 +562,50 @@ export default function App() {
   );
 }
 
-function Sidebar({ detailOpen, onShowList }: { detailOpen: boolean; onShowList: () => void }) {
+function Sidebar({ detailOpen, adminOpen, onShowList, onShowAdmin }: { detailOpen: boolean; adminOpen: boolean; onShowList: () => void; onShowAdmin: () => void }) {
   return <aside className="sidebar">
     <div className="brand"><span className="brand-mark">R</span><span>Release Hub</span></div>
     <nav aria-label="メインメニュー">
-      {!detailOpen ? <span className="nav-item nav-current active"><span>▦</span>作業一覧</span> : <><button className="nav-item nav-back" onClick={onShowList}><span>‹</span>作業一覧へ戻る</button><span className="nav-group-label">この作業</span><div className="nav-children"><a className="nav-item" href="#overview"><span>⌂</span>作業概要</a><a className="nav-item" href="#timeline"><span>◷</span>当日オペレーション</a><a className="nav-item" href="#approvals"><span>✓</span>申請物</a><a className="nav-item" href="#links"><span>↗</span>リンク集</a></div></>}
+      {!detailOpen && !adminOpen ? <span className="nav-item nav-current active"><span>▦</span>作業一覧</span> : <button className="nav-item nav-back" onClick={onShowList}><span>‹</span>作業一覧へ戻る</button>}{detailOpen && <><span className="nav-group-label">この作業</span><div className="nav-children"><a className="nav-item" href="#overview"><span>⌂</span>作業概要</a><a className="nav-item" href="#timeline"><span>◷</span>当日オペレーション</a><a className="nav-item" href="#approvals"><span>✓</span>申請物</a><a className="nav-item" href="#links"><span>↗</span>リンク集</a></div></>}<span className="nav-group-label">管理</span><button className={`nav-item ${adminOpen ? "active" : ""}`} onClick={onShowAdmin}><span>⚙</span>申請種別管理</button>
     </nav>
     <div className="side-note"><strong>親子構造で管理</strong><span>作業を登録し、必要な明細をひとつに集約</span></div>
     <div className="user-chip"><span className="avatar">RT</span><div><strong>Release Team</strong><small>社内環境</small></div></div>
   </aside>;
+}
+
+function ApprovalCategoryAdmin({ categories, saving, error, onBack, onCreate, onSave, onDelete }: { categories: ApprovalCategory[]; saving: boolean; error: string; onBack: () => void; onCreate: (name: string, description: string) => Promise<boolean>; onSave: (category: ApprovalCategory) => Promise<boolean>; onDelete: (id: number) => Promise<boolean> }) {
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  async function submitNew(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = Object.fromEntries(new FormData(form).entries());
+    if (await onCreate(String(values.name), String(values.description || ""))) form.reset();
+  }
+
+  async function submitEdit(event: FormEvent<HTMLFormElement>, category: ApprovalCategory) {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+    if (await onSave({ ...category, name: String(values.name), description: String(values.description || "") })) setEditingId(null);
+  }
+
+  async function confirmDelete(id: number) {
+    if (await onDelete(id)) setDeleteId(null);
+  }
+
+  return <>
+    <header className="topbar admin-topbar"><div><button className="back-button" onClick={onBack}>‹ 作業一覧</button><span className="eyebrow">ADMINISTRATION</span><h1>申請種別管理</h1><p>申請物で利用するカテゴリ候補を管理します。認証・権限制御なしで利用できます。</p></div></header>
+    <section className="admin-overview"><div><span className="section-kicker">APPROVAL CATEGORY MASTER</span><strong>{categories.length}</strong><p>登録済みの申請種別</p></div><div><strong>自由入力対応</strong><p>申請登録時はマスタ選択のほか、任意の種別名も入力できます。</p></div></section>
+    {error && <div className="admin-error" role="alert">{error}</div>}
+    <div className="admin-grid">
+      <section className="panel category-create-panel"><div className="panel-heading"><div><span className="section-kicker">NEW CATEGORY</span><h2>申請種別を追加</h2></div></div><form onSubmit={submitNew}><label>申請種別名<input name="name" placeholder="例：資源配布、WF" required autoFocus /></label><label>説明（任意）<textarea name="description" rows={4} placeholder="利用目的や対象となる申請を記載" /></label><button type="submit" className="primary-button" disabled={saving}>{saving ? "保存中" : "＋ 申請種別を追加"}</button></form></section>
+      <section className="panel category-list-panel"><div className="panel-heading"><div><span className="section-kicker">CATEGORIES</span><h2>登録済み申請種別</h2></div><span className="list-count">{categories.length}件</span></div><div className="category-list">
+        {categories.map((category) => editingId === category.id ? <form className="category-edit-row" key={category.id} onSubmit={(event) => void submitEdit(event, category)}><label>申請種別名<input name="name" defaultValue={category.name} required autoFocus /></label><label>説明（任意）<textarea name="description" defaultValue={category.description} rows={3} /></label><div><button type="button" className="ghost-button" onClick={() => setEditingId(null)} disabled={saving}>キャンセル</button><button type="submit" className="primary-button" disabled={saving}>{saving ? "保存中" : "変更を保存"}</button></div></form> : <article className="category-row" key={category.id}><span className="category-icon">✓</span><div><strong>{category.name}</strong><p>{category.description || "説明未設定"}</p></div>{deleteId === category.id ? <div className="category-delete-confirm"><span>削除しますか？</span><button type="button" onClick={() => setDeleteId(null)} disabled={saving}>戻る</button><button type="button" className="danger" onClick={() => void confirmDelete(category.id)} disabled={saving}>削除</button></div> : <div className="category-row-actions"><button type="button" onClick={() => { setEditingId(category.id); setDeleteId(null); }} disabled={saving}>編集</button><button type="button" className="danger" onClick={() => { setDeleteId(category.id); setEditingId(null); }} disabled={saving}>削除</button></div>}</article>)}
+        {!categories.length && <div className="empty-state compact"><span>＋</span><h3>申請種別がありません</h3><p>左のフォームから最初の申請種別を登録してください。</p></div>}
+      </div></section>
+    </div>
+  </>;
 }
 
 function shiftMonth(month: string, delta: number) {
@@ -538,7 +683,7 @@ function WorkDetail({ work, loading, saving, onBack, onCopy, onDelete, onOpenMod
     <div id="overview" className="release-banner"><div className="release-main"><span className="status-pill">{work.release.status}</span><h2>{work.release.version || "バージョン未設定"}</h2><p><span className="system-id-badge">{work.release.systemId}</span>{work.release.environment} 環境</p></div><div className="release-meta"><div><span>実施日時</span><strong>{work.release.releaseDate}</strong></div><div><span>責任者</span><strong>{work.release.manager}</strong></div><div><span>作業進捗</span><strong>{progress}%</strong></div><div className="progress-track"><i style={{ width: `${progress}%` }} /></div></div></div>
     <div className="summary-grid"><article className="metric-card"><span className="metric-icon blue">◷</span><div><small>作業項目</small><strong>{work.timeline.length}</strong><em>件</em></div><p>{completed}件 完了</p></article><article className="metric-card"><span className="metric-icon purple">♙</span><div><small>当日体制</small><strong>{work.staffing.length}</strong><em>名</em></div><p>対応メンバー</p></article><article className="metric-card"><span className="metric-icon green">✓</span><div><small>申請・承認</small><strong>{approved}</strong><em>/{work.approvals.length}</em></div><p>結了済み</p></article><article className="metric-card"><span className="metric-icon amber">↗</span><div><small>関連資料</small><strong>{work.links.length}</strong><em>件</em></div><p>すぐにアクセス</p></article></div>
     <div className="workspace-grid"><section id="timeline" className={`panel timeline-panel ${timelineView === "gantt" ? "gantt-panel" : ""}`}><div className="panel-heading"><div><span className="section-kicker">ALL-IN-ONE</span><h2>当日オペレーション</h2><p className="timeline-drag-hint">{timelineView === "list" ? "作業と当日体制を一覧で編集。作業行は上下にドラッグ可能" : "作業と当日体制を同じ時間軸で表示。各バーは5分単位でドラッグ変更"}</p></div><div className="panel-actions"><div className="view-switch" aria-label="オールインワン表示"><button className={timelineView === "list" ? "active" : ""} onClick={() => setTimelineView("list")} aria-pressed={timelineView === "list"}>☷ リスト</button><button className={timelineView === "gantt" ? "active" : ""} onClick={() => setTimelineView("gantt")} aria-pressed={timelineView === "gantt"}>▥ ガント</button></div><button className="staffing-button" onClick={() => onOpenModal("staffing")}>＋ 体制を追加</button><button className="primary-button compact-button" onClick={() => onOpenModal("timeline")}>＋ 作業</button></div></div>{timelineView === "list" ? <AllInOneList items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEditTimeline={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} onReorder={onReorderTimeline} onStatusChange={onUpdateTimelineStatus} /> : <GanttChart items={work.timeline} assignments={work.staffing} disabled={loading || saving} onEdit={(item) => onOpenEditor({ type: "timeline", item })} onEditStaffing={(item) => onOpenEditor({ type: "staffing", item })} onTimeChange={onUpdateTimelineTime} onStaffingTimeChange={onUpdateStaffingTime} onStatusChange={onUpdateTimelineStatus} />}</section>
-      <section id="approvals" className="panel approvals-panel"><div className="panel-heading"><div><span className="section-kicker">APPROVALS</span><h2>申請物一覧</h2></div><button className="ghost-button" onClick={() => onOpenModal("approval")}>＋ 追加</button></div><div className="approval-list">{work.approvals.map((item) => <button type="button" key={item.id} className="approval-row" onClick={() => onOpenPreview({ type: "approval", item })} aria-label={`${item.title}の詳細を開く`}><span className={`approval-status-icon status-${item.status}`} aria-hidden="true">{item.status === "未申請" ? "○" : item.status === "申請中" ? "↗" : item.status === "回付済" ? "⇢" : "✓"}</span><span><strong>{item.title}</strong><small>{item.owner}・期限 {formatDueDate(item.due)}</small></span><span className={`tag status-${item.status}`}>{item.status}</span><span className="external-link">詳細を見る ›</span></button>)}{!work.approvals.length && <p className="section-empty">まだ申請物はありません</p>}</div></section></div>
+      <section id="approvals" className="panel approvals-panel"><div className="panel-heading"><div><span className="section-kicker">APPROVALS</span><h2>申請物一覧</h2></div><button className="ghost-button" onClick={() => onOpenModal("approval")}>＋ 追加</button></div><div className="approval-list">{work.approvals.map((item) => <button type="button" key={item.id} className="approval-row" onClick={() => onOpenPreview({ type: "approval", item })} aria-label={`${item.title}の詳細を開く`}><span className={`approval-status-icon status-${item.status}`} aria-hidden="true">{item.status === "未申請" ? "○" : item.status === "申請中" ? "↗" : item.status === "回付済" ? "⇢" : "✓"}</span><span><strong>{item.title}</strong><small>{item.category ? <b className="approval-category-badge">{item.category}</b> : null}{item.owner}・期限 {formatDueDate(item.due)}</small></span><span className={`tag status-${item.status}`}>{item.status}</span><span className="external-link">詳細を見る ›</span></button>)}{!work.approvals.length && <p className="section-empty">まだ申請物はありません</p>}</div></section></div>
     <section id="links" className="panel links-panel"><div className="panel-heading"><div><span className="section-kicker">RESOURCES</span><h2>手順書・関連リンク</h2></div><button className="ghost-button" onClick={() => onOpenModal("link")}>＋ 追加</button></div><div className="link-grid">{work.links.map((item) => <button type="button" key={item.id} className="link-card" onClick={() => onOpenPreview({ type: "link", item })} aria-label={`${item.title}の詳細を開く`}><span className="doc-icon">▤</span><span><small>{item.category}</small><strong>{item.title}</strong><p>{item.description}</p></span><b>›</b></button>)}</div>{!work.links.length && <p className="section-empty links-empty">まだリンクはありません</p>}</section>
     <footer>最終更新：{work.release.updatedAt || "未更新"} ・ {work.release.updatedBy}</footer>
   </>;
@@ -757,7 +902,7 @@ function DeleteConfirmModal({ work, saving, onClose, onConfirm }: { work: Releas
   return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><div className="modal delete-confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-description" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="section-kicker danger">DELETE RELEASE WORK</span><h2 id="delete-confirm-title">リリース作業を削除しますか？</h2></div><button onClick={onClose} aria-label="閉じる" disabled={saving}>×</button></div><div className="delete-confirm-body"><strong>{work.release.name}</strong><p id="delete-confirm-description">タイムチャート、当日体制、申請物、関連リンクを含む{detailCount}件の明細も削除されます。この操作は取り消せません。</p></div><div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose} disabled={saving}>キャンセル</button><button type="button" className="danger-button solid" onClick={onConfirm} disabled={saving}>{saving ? "削除中" : "作業を削除する"}</button></div></div></div>;
 }
 
-function ItemModal({ type, editTarget, releaseDate, staffing: staffingOptions, formError, saving, onClose, onSubmit }: { type: ModalType; editTarget: EditTarget | null; releaseDate?: string; staffing: StaffingAssignment[]; formError: string; saving: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+function ItemModal({ type, editTarget, releaseDate, staffing: staffingOptions, approvalCategories, formError, saving, onClose, onSubmit }: { type: ModalType; editTarget: EditTarget | null; releaseDate?: string; staffing: StaffingAssignment[]; approvalCategories: ApprovalCategory[]; formError: string; saving: boolean; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   const work = editTarget?.type === "work" ? editTarget.item : null;
   const staffing = editTarget?.type === "staffing" ? editTarget.item : null;
   const timeline = editTarget?.type === "timeline" ? editTarget.item : null;
@@ -775,7 +920,7 @@ function ItemModal({ type, editTarget, releaseDate, staffing: staffingOptions, f
     {type === "work" && <><div className="field-row"><label>SystemID<input name="systemId" defaultValue={work?.systemId} placeholder="例：PAYMENT" required autoFocus /></label><label>作業名<input name="name" defaultValue={work?.name} placeholder="例：決済基盤アップデート" required /></label></div><div className="field-row"><label>バージョン（任意）<input name="version" defaultValue={work?.version} placeholder="例：v2.8.0" /></label><label>環境<select name="environment" defaultValue={work?.environment || "Production"}><option>Production</option><option>Staging</option><option>Development</option></select></label></div><label>作業日時<input name="releaseDate" type="datetime-local" defaultValue={work?.releaseDate.replace(" ", "T")} required /></label><label>責任者<input name="manager" defaultValue={work?.manager} placeholder="例：田中" required /></label>{work && <label>状態<select name="status" defaultValue={work.status}><option>準備中</option><option>進行中</option><option>完了</option></select></label>}<p className="form-hint">{work ? "作業の基本情報を更新します。紐づく明細は保持されます。" : "登録後にタイムチャート・申請物・資料を追加します。"}</p></>}
     {type === "staffing" && <><div className="field-row"><label>氏名<input name="name" defaultValue={staffing?.name} placeholder="例：佐藤" required autoFocus /></label><label>電話番号<input name="phone" type="tel" defaultValue={staffing?.phone} placeholder="例：090-1234-5678" /></label></div><div className="field-row"><label>対応開始日時<input name="startAt" type="datetime-local" defaultValue={staffingStartAt} required /></label><label>対応終了日時<input name="endAt" type="datetime-local" defaultValue={staffingEndAt} required /></label></div><p className="field-help">新規追加時は当日作業の開始から8時間を初期表示します。</p><label>場所・待機形態<input name="location" defaultValue={staffing?.location} placeholder="例：名古屋、オンコール" required /></label><label>役割・補足<input name="note" defaultValue={staffing?.note} placeholder="例：現地対応、一次連絡先" /></label></>}
     {type === "timeline" && <><div className="field-row"><label>作業内容<input name="title" defaultValue={timeline?.title} placeholder="例：本番デプロイ" required autoFocus /></label><label>担当者<input name="owner" list="staffing-owner-options" defaultValue={timeline?.owner} placeholder="当日体制から選択または入力" required /></label><datalist id="staffing-owner-options">{staffingOptions.map((assignment) => <option value={assignment.name} key={assignment.id}>{assignment.location}</option>)}</datalist></div><div className="field-row timeline-classification"><label>種別<select name="kind" defaultValue={timeline?.kind || "作業"}><option>作業</option><option>申請物</option></select></label><label>区分<select name="plan" defaultValue={timeline?.plan || "本線"}><option>本線</option><option>コンチプラン</option></select></label><label>状態<select name="status" defaultValue={timeline?.status || "未着手"}><option>未着手</option><option>進行中</option><option>完了</option></select></label></div><p className="field-help">担当者は当日体制の登録メンバーから選択できます。未登録の名前も直接入力できます。</p><fieldset className="time-fieldset"><legend>予定</legend><div className="field-row"><label>作業日<input name="workDate" type="date" defaultValue={plannedStartAt.slice(0, 10)} required /></label><label>終了日<input name="endDate" type="date" defaultValue={plannedEndAt.slice(0, 10)} required /></label></div><div className="field-row"><label>開始時刻<input name="startTime" type="time" step="300" defaultValue={plannedStartAt.slice(11, 16)} required /></label><label>終了時刻<input name="endTime" type="time" step="300" defaultValue={plannedEndAt.slice(11, 16)} required /></label></div><div className="duration-presets"><span>開始から</span>{[15, 30, 60].map((minutes) => <button type="button" key={minutes} onClick={(event) => setPlannedDuration(event.currentTarget, minutes)}>＋{minutes}分</button>)}</div><p className="field-help">作業日と開始時刻は親作業の予定日時を初期表示します。日を跨ぐ場合は終了日を変更できます。</p></fieldset><fieldset className="time-fieldset actual"><legend>実績（任意）</legend><div className="field-row"><div className="actual-datetime-field"><label>実績開始日時<input name="actualStartAt" type="datetime-local" defaultValue={timeline?.actualStartAt} /></label><button type="button" className="set-now-button" onClick={(event) => setCurrentDateTime(event.currentTarget, "actualStartAt")}>◷ 今を開始に設定</button></div><div className="actual-datetime-field"><label>実績終了日時<input name="actualEndAt" type="datetime-local" defaultValue={timeline?.actualEndAt} /></label><button type="button" className="set-now-button" onClick={(event) => setCurrentDateTime(event.currentTarget, "actualEndAt")}>◷ 今を終了に設定</button></div></div><p className="field-help">作業中は実績開始のみ入力できます。</p></fieldset></>}
-    {type === "approval" && <><label>申請名<input name="title" defaultValue={approval?.title} required autoFocus /></label><div className="field-row"><label>担当者<input name="owner" defaultValue={approval?.owner} required /></label><label>状態<select name="status" defaultValue={approval?.status || "未申請"}><option>未申請</option><option>申請中</option><option>回付済</option><option>結了済</option></select></label></div><label>期限<input name="due" type="date" defaultValue={approval?.due || releaseDate?.slice(0, 10)} required /></label><label>申請リンク（任意）<input name="url" inputMode="url" defaultValue={approval?.url} placeholder="後から登録できます" /></label></>}
+    {type === "approval" && <><label>申請名<input name="title" defaultValue={approval?.title} required autoFocus /></label><label>申請種別（任意）<input name="category" list="approval-category-options" defaultValue={approval?.category} placeholder="候補から選択または手入力" /></label><datalist id="approval-category-options">{approvalCategories.map((category) => <option value={category.name} key={category.id}>{category.description}</option>)}</datalist><p className="field-help">管理画面の候補から選択できます。候補にない種別も直接入力できます。</p><div className="field-row"><label>担当者<input name="owner" defaultValue={approval?.owner} required /></label><label>状態<select name="status" defaultValue={approval?.status || "未申請"}><option>未申請</option><option>申請中</option><option>回付済</option><option>結了済</option></select></label></div><label>期限<input name="due" type="date" defaultValue={approval?.due || releaseDate?.slice(0, 10)} required /></label><label>申請リンク（任意）<input name="url" inputMode="url" defaultValue={approval?.url} placeholder="後から登録できます" /></label></>}
     {type === "link" && <><label>タイトル<input name="title" defaultValue={link?.title} required autoFocus /></label><label>カテゴリ<input name="category" defaultValue={link?.category} placeholder="手順書" required /></label><label>説明<input name="description" defaultValue={link?.description} required /></label><label>URL（任意）<input name="url" inputMode="url" defaultValue={link?.url} placeholder="後から登録できます" /></label></>}
     <div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose}>キャンセル</button><button type="submit" className="primary-button" disabled={saving}>{saving ? "保存中" : editing ? "変更を保存" : type === "work" ? "登録して明細へ" : "追加する"}</button></div>
   </form></div></div>;
@@ -785,7 +930,7 @@ function PreviewModal({ preview, onClose, onEdit }: { preview: PreviewItem; onCl
   const isApproval = preview.type === "approval";
   const item = preview.item;
   return <div className="modal-backdrop" role="presentation" onMouseDown={onClose}><div className="modal preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-title" onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="section-kicker">{isApproval ? "APPROVAL DETAIL" : "RESOURCE DETAIL"}</span><h2 id="preview-title">{item.title}</h2></div><button onClick={onClose} aria-label="閉じる">×</button></div><div className="preview-body">
-    {isApproval ? <><div className="preview-status"><span className={`tag status-${preview.item.status}`}>{preview.item.status}</span></div><dl><div><dt>担当者</dt><dd>{preview.item.owner}</dd></div><div><dt>期限</dt><dd>{formatDueDate(preview.item.due)}</dd></div></dl></> : <><span className="preview-category">{preview.item.category}</span><p>{preview.item.description}</p></>}
+    {isApproval ? <><div className="preview-status"><span className={`tag status-${preview.item.status}`}>{preview.item.status}</span>{preview.item.category && <span className="preview-category">{preview.item.category}</span>}</div><dl><div><dt>担当者</dt><dd>{preview.item.owner}</dd></div><div><dt>期限</dt><dd>{formatDueDate(preview.item.due)}</dd></div></dl></> : <><span className="preview-category">{preview.item.category}</span><p>{preview.item.description}</p></>}
     <div className="modal-actions"><button type="button" className="ghost-button" onClick={() => onEdit(preview)}>情報を編集</button>{item.url ? <a className="primary-button modal-link-button" href={item.url} target="_blank" rel="noopener noreferrer">リンクを開く ↗</a> : <span className="link-unregistered">リンク未登録</span>}</div>
   </div></div></div>;
 }
