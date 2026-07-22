@@ -100,16 +100,18 @@ sequenceDiagram
   SPA->>SPA: ReleaseRecordをReleaseWorkへ変換
   U->>SPA: 明細を編集して保存
   SPA->>SPA: 楽観的に画面更新
-  SPA->>API: PUT /v2/releases/:id
-  API->>DB: 全体を一時ファイル経由で置換
+  SPA->>API: PATCH /v2/releases/:id（変更項目のみ）
+  API->>DB: 対象項目を一時ファイル経由で更新
   API-->>SPA: 保存後のReleaseRecord
   alt 保存失敗
     SPA->>SPA: 直前の状態へ戻してエラー表示
   end
 ```
 
-- 保存は作業全体をPUTする。
-- SPAは保存前に画面へ反映し、失敗時は直前の作業へ戻す。
+- 保存は変更したトップレベル項目だけをPATCHし、未変更の明細配列は送信しない。
+- SPAは保存要求を直列化し、連続したドラッグや状態変更を操作順に反映する。
+- SPAは保存前に画面へ反映し、最新の保存が失敗した場合は直前の作業へ戻す。
+- 既存Timelineが空になる予期しない更新はクライアント側で中止し、再読み込みを促す。
 - デモモードではAPI呼び出しをせず、`demoWorks` と `summaries` を更新する。
 
 ### 4.3 一覧・カレンダー

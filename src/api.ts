@@ -5,6 +5,8 @@ const apiBase = configuredBase.replace(/\/$/, "");
 const releasesPath = "/v2/releases";
 const categoriesPath = "/v2/categories";
 
+export type ReleaseWorkSection = "release" | "timeline" | "staffing" | "approvals" | "links";
+
 type RequestErrorMessages = {
   notFound?: string;
   failed?: string;
@@ -36,10 +38,6 @@ function workFromRecord(record: ReleaseRecord): ReleaseWork {
     approvals: work.approvals ?? [],
     links: work.links ?? [],
   };
-}
-
-function recordFromWork(work: ReleaseWork): ReleaseRecord {
-  return { ...work, id: work.release.id };
 }
 
 function summaryFromRecord(record: ReleaseRecord): ReleaseSummary {
@@ -96,11 +94,14 @@ export async function createReleaseCopy(draft: ReleaseWork) {
   return workFromRecord(created);
 }
 
-export async function saveReleaseWork(work: ReleaseWork) {
+export async function saveReleaseWork(work: ReleaseWork, section: ReleaseWorkSection) {
+  const body = section === "release"
+    ? { id: work.release.id, release: work.release }
+    : { id: work.release.id, [section]: work[section] };
   const saved = await request<ReleaseRecord>(`${releasesPath}/${work.release.id}`, {
-    method: "PUT",
+    method: "PATCH",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(recordFromWork(work)),
+    body: JSON.stringify(body),
   }, { notFound: "対象の作業が見つかりません" });
   return workFromRecord(saved);
 }

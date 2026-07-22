@@ -1,5 +1,5 @@
 import { type CSSProperties, type DragEvent, type FormEvent, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createCategory, createReleaseCopy, createReleaseWork, deleteCategory, deleteReleaseWork, fetchCategories, fetchReleaseSummaries, fetchReleaseWork, saveCategory, saveReleaseWork } from "./api";
+import { createCategory, createReleaseCopy, createReleaseWork, deleteCategory, deleteReleaseWork, fetchCategories, fetchReleaseSummaries, fetchReleaseWork, saveCategory, saveReleaseWork, type ReleaseWorkSection } from "./api";
 import { sampleWork } from "./sampleData";
 import type { ApprovalItem, ApprovalStatus, Category, CreateReleaseInput, ReleaseSummary, ReleaseWork, ResourceLink, StaffingAssignment, TimelineItem, TimelineKind, TimelinePlan, TimelineStatus } from "./types";
 
@@ -113,6 +113,11 @@ export default function App() {
   const demoWorksRef = useRef(demoWorks);
   demoWorksRef.current = demoWorks;
   const [selected, setSelected] = useState<ReleaseWork | null>(null);
+  const selectedRef = useRef<ReleaseWork | null>(selected);
+  selectedRef.current = selected;
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const latestSaveIdRef = useRef(0);
+  const pendingSaveCountRef = useRef(0);
   const [adminOpen, setAdminOpen] = useState(false);
   const [approvalCategories, setApprovalCategories] = useState<Category[]>(demoMode ? sampleApprovalCategories : []);
   const [categorySaving, setCategorySaving] = useState(false);
@@ -292,13 +297,23 @@ export default function App() {
     }
   }
 
-  async function commit(nextWork: ReleaseWork) {
-    if (!selected) return;
-    const previous = selected;
+  function commit(nextWork: ReleaseWork, section: ReleaseWorkSection) {
+    const previous = selectedRef.current;
+    if (!previous || previous.release.id !== nextWork.release.id) return;
+    const consolidated: ReleaseWork = section === "release" ? { ...previous, release: nextWork.release }
+      : section === "timeline" ? { ...previous, timeline: nextWork.timeline }
+        : section === "staffing" ? { ...previous, staffing: nextWork.staffing }
+          : section === "approvals" ? { ...previous, approvals: nextWork.approvals }
+            : { ...previous, links: nextWork.links };
+    if (section === "timeline" && previous.timeline.length > 0 && consolidated.timeline.length === 0) {
+      setError("Timelineが空になる保存を安全のため中止しました。一覧を更新して内容を確認してください。");
+      return;
+    }
     const stamped: ReleaseWork = {
-      ...nextWork,
-      release: { ...nextWork.release, updatedAt: new Date().toLocaleString("ja-JP") },
+      ...consolidated,
+      release: section === "release" ? { ...consolidated.release, updatedAt: new Date().toLocaleString("ja-JP") } : consolidated.release,
     };
+    selectedRef.current = stamped;
     setSelected(stamped);
     if (demoMode) {
       setDemoWorks((current) => current.map((work) => work.release.id === stamped.release.id ? stamped : work));
@@ -306,18 +321,36 @@ export default function App() {
       setError("");
       return;
     }
+    const saveId = ++latestSaveIdRef.current;
+    pendingSaveCountRef.current += 1;
     setSaving(true);
-    try {
-      const saved = await saveReleaseWork(stamped);
-      setSelected(saved);
-      setSummaries((current) => current.map((summary) => summary.id === saved.release.id ? toSummary(saved) : summary));
-      setError("");
-    } catch (reason) {
-      setSelected(previous);
-      setError(reason instanceof Error ? reason.message : "保存に失敗しました");
-    } finally {
-      setSaving(false);
-    }
+    saveQueueRef.current = saveQueueRef.current.then(async () => {
+      try {
+        const saved = await saveReleaseWork(stamped, section);
+        if (saveId === latestSaveIdRef.current && selectedRef.current?.release.id === saved.release.id) {
+          selectedRef.current = saved;
+          setSelected(saved);
+          setSummaries((current) => current.map((summary) => summary.id === saved.release.id ? toSummary(saved) : summary));
+          setError("");
+        }
+      } catch (reason) {
+        if (saveId === latestSaveIdRef.current) {
+          try {
+            const reloaded = normalizeWork(await fetchReleaseWork(stamped.release.id));
+            selectedRef.current = reloaded;
+            setSelected(reloaded);
+            setSummaries((current) => current.map((summary) => summary.id === reloaded.release.id ? toSummary(reloaded) : summary));
+          } catch {
+            selectedRef.current = previous;
+            setSelected(previous);
+          }
+          setError(reason instanceof Error ? reason.message : "保存に失敗しました");
+        }
+      } finally {
+        pendingSaveCountRef.current -= 1;
+        if (pendingSaveCountRef.current === 0) setSaving(false);
+      }
+    });
   }
 
   async function deleteSelectedWork() {
@@ -365,12 +398,13 @@ export default function App() {
   }
 
   function reorderTimeline(sourceId: number, targetId: number | null, targetPlan: TimelinePlan) {
-    if (!selected) return;
-    const sourceIndex = selected.timeline.findIndex((item) => item.id === sourceId);
+    const current = selectedRef.current;
+    if (!current) return;
+    const sourceIndex = current.timeline.findIndex((item) => item.id === sourceId);
     if (sourceIndex < 0) return;
-    const source = selected.timeline[sourceIndex];
+    const source = current.timeline[sourceIndex];
     if (sourceId === targetId && source.plan === targetPlan) return;
-    const timeline = [...selected.timeline];
+    const timeline = [...current.timeline];
     const [moved] = timeline.splice(sourceIndex, 1);
     const updated = { ...moved, plan: targetPlan };
     if (targetId === null) {
@@ -381,32 +415,35 @@ export default function App() {
       if (targetIndex < 0) return;
       timeline.splice(targetIndex, 0, updated);
     }
-    void commit({ ...selected, timeline });
+    commit({ ...current, timeline }, "timeline");
   }
 
   function updateTimelineTime(id: number, startAt: string, endAt: string) {
-    if (!selected) return;
-    const timeline = selected.timeline.map((item) => item.id === id ? { ...item, startAt, endAt } : item);
-    void commit({ ...selected, timeline });
+    const current = selectedRef.current;
+    if (!current) return;
+    const timeline = current.timeline.map((item) => item.id === id ? { ...item, startAt, endAt } : item);
+    commit({ ...current, timeline }, "timeline");
   }
 
   function updateStaffingTime(id: number, startAt: string, endAt: string) {
-    if (!selected) return;
-    const staffing = selected.staffing.map((item) => item.id === id ? { ...item, startAt, endAt } : item);
-    void commit({ ...selected, staffing });
+    const current = selectedRef.current;
+    if (!current) return;
+    const staffing = current.staffing.map((item) => item.id === id ? { ...item, startAt, endAt } : item);
+    commit({ ...current, staffing }, "staffing");
   }
 
   function updateTimelineStatus(id: number, action: "start" | "complete") {
-    if (!selected) return;
+    const current = selectedRef.current;
+    if (!current) return;
     const now = currentLocalDateTime();
-    const timeline = selected.timeline.map((item) => {
+    const timeline = current.timeline.map((item) => {
       if (item.id !== id) return item;
       if (action === "start") return { ...item, status: "進行中" as TimelineStatus, actualStartAt: item.actualStartAt || now, actualEndAt: "" };
       const actualStartAt = item.actualStartAt || fromMinutes(toMinutes(now) - 1);
       const actualEndAt = toMinutes(now) > toMinutes(actualStartAt) ? now : fromMinutes(toMinutes(actualStartAt) + 1);
       return { ...item, status: "完了" as TimelineStatus, actualStartAt, actualEndAt };
     });
-    void commit({ ...selected, timeline });
+    commit({ ...current, timeline }, "timeline");
   }
 
   async function submitCopy(event: FormEvent<HTMLFormElement>) {
@@ -471,7 +508,7 @@ export default function App() {
           },
         };
         closeModal();
-        void commit(nextWork);
+        commit(nextWork, "release");
         return;
       }
       const input: CreateReleaseInput = {
@@ -547,7 +584,7 @@ export default function App() {
       nextWork = { ...selected, links: editing ? selected.links.map((row) => row.id === editing.id ? item : row) : [...selected.links, item] };
     }
     closeModal();
-    void commit(nextWork);
+    commit(nextWork, modal === "staffing" ? "staffing" : modal === "timeline" ? "timeline" : modal === "approval" ? "approvals" : "links");
   }
 
   return (

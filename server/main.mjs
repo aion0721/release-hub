@@ -291,6 +291,28 @@ const server = createServer(async (request, response) => {
       sendJson(response, updated ? 200 : 404, updated || { error: "Resource item not found" });
       return;
     }
+    if (releaseMatch && method === "PATCH") {
+      const id = Number(releaseMatch[1]);
+      const input = await readBody(request);
+      if (input.id !== undefined && Number(input.id) !== id) { sendJson(response, 400, { error: "Resource id does not match request path" }); return; }
+      const patch = {};
+      if (input.release && typeof input.release === "object") patch.release = input.release;
+      for (const key of ["timeline", "staffing", "approvals", "links"]) {
+        if (input[key] !== undefined) {
+          if (!Array.isArray(input[key])) { sendJson(response, 400, { error: `Invalid ${key} data` }); return; }
+          patch[key] = input[key];
+        }
+      }
+      if (!Object.keys(patch).length) { sendJson(response, 400, { error: "No supported release fields supplied" }); return; }
+      const updated = await mutateDatabase((records) => {
+        const index = records.findIndex((item) => item.id === id);
+        if (index < 0) return null;
+        records[index] = normalizeRecord({ ...records[index], ...patch, id });
+        return records[index];
+      });
+      sendJson(response, updated ? 200 : 404, updated || { error: "Resource item not found" });
+      return;
+    }
     if (releaseMatch && method === "DELETE") {
       const id = Number(releaseMatch[1]);
       const deleted = await mutateDatabase((records) => {

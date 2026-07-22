@@ -25,6 +25,7 @@
 - 共有API: [light-api-server v2](https://github.com/aion0721/light-api-server/tree/v2)（Node.js標準モジュールのみ、依存パッケージ0）
 - APIリソース: `/v2/releases`、`/v2/categories`
 - データ保存: light-api-serverの `DATA_DIR/releases.json`、`DATA_DIR/categories.json`
+- 明細保存は変更したトップレベル項目だけをPATCHし、画面内の連続操作は順番に保存します。申請物や体制の編集で既存Timelineを巻き込んで上書きしません。
 - CI: GitLab CIで型検査、テスト、SPAビルド
 
 ## ローカル開発

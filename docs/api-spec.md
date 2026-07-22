@@ -87,7 +87,7 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
 - SPAは受信時に `release.id` をトップレベルの `id`へ揃える。
 - SPAは保存時に `release.id` と同じトップレベル `id`を付ける。
 - 一覧用の進捗、作業件数、申請件数はSPAがReleaseRecordから計算する。
-- `updatedAt`はSPAが保存操作時に更新する。
+- `updatedAt`はSPAが親作業の基本情報を保存するときに更新する。
 - `updatedBy`は新規登録時に責任者を初期値とする。利用者識別が必要な場合は認証基盤側で別途設計する。
 - `release.projectNumber`は任意で、未設定時は空文字を保存する。旧`release.version`はSPAとローカル互換APIがprojectNumberへ移行し、versionは削除する。
 - `timeline.kind`は「作業」または「申請物」。旧データで未設定の場合はSPAとローカル互換APIが「作業」として扱う。
@@ -105,6 +105,7 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
 | POST | `/v2/releases` | ReleaseRecord作成 |
 | GET | `/v2/releases/:id` | 1件取得 |
 | PUT | `/v2/releases/:id` | 1件全置換 |
+| PATCH | `/v2/releases/:id` | 変更したトップレベル項目だけを更新 |
 | DELETE | `/v2/releases/:id` | 親作業と配下明細を削除 |
 | GET | `/v2/categories` | 全scopeのカテゴリ一覧取得 |
 | POST | `/v2/categories` | カテゴリ作成 |
@@ -112,7 +113,7 @@ light-api-serverへ保存する単位は、トップレベルIDを持つ `Releas
 | DELETE | `/v2/categories/:id` | カテゴリ削除 |
 | OPTIONS | 任意 | CORSプリフライト |
 
-light-api-server自体はPATCHとクエリ絞り込みも提供するが、現行Release Hubの画面は使用しない。一覧のSystemID・状態フィルターは取得済みReleaseRecordへSPA側で適用する。
+Release Hubの画面は明細保存にPATCHを使用する。一覧のSystemID・状態フィルターは取得済みReleaseRecordへSPA側で適用する。
 
 カテゴリは汎用リソース`categories`へ `{ id, scope, name, description }` 形式で保存する。申請種別は`scope=approval`とし、SPAが取得後にscopeで絞り込む。将来は`resource-link`等のscopeを追加できる。Release Hub専用エンドポイントは設けず、light-api-server v2の通常CRUDとして扱う。
 
@@ -177,6 +178,10 @@ SPAは入力値から空の明細配列を持つReleaseWorkを組み立てて送
 | 200 | 更新成功 |
 | 400 | URLとbodyのID不一致、JSON不正 |
 | 404 | 対象なし |
+
+### PATCH /v2/releases/:id
+
+画面からの通常保存は、`release`、`timeline`、`staffing`、`approvals`、`links`のうち変更したトップレベル項目だけを送信する。別項目の配列を送らないため、古い画面状態からの保存で既存Timelineなどを空配列へ置き換えない。画面内で発生した複数の保存要求はSPAが直列に送信する。
 
 ## 11. DELETE /v2/releases/:id
 

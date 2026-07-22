@@ -58,6 +58,14 @@ async function saveRelease(baseUrl, work) {
   });
 }
 
+async function patchRelease(baseUrl, id, patch) {
+  return requestJson(`${baseUrl}/v2/releases/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id, ...patch }),
+  });
+}
+
 test("SPA contains editable release-operation controls", async () => {
   const [app, apiClient, html] = await Promise.all([
     readFile(new URL("../src/App.tsx", import.meta.url), "utf8"),
@@ -113,7 +121,10 @@ test("SPA contains editable release-operation controls", async () => {
   const previewSource = app.slice(app.indexOf("function PreviewModal"));
   assert.doesNotMatch(previewSource, /onClick=\{onClose\}>閉じる<\/button>/);
   assert.match(apiClient, /\/v2\/releases/);
-  assert.match(apiClient, /recordFromWork/);
+  assert.match(apiClient, /ReleaseWorkSection/);
+  assert.match(apiClient, /method: "PATCH"/);
+  assert.match(app, /saveQueueRef\.current = saveQueueRef\.current\.then/);
+  assert.match(app, /Timelineが空になる保存を安全のため中止しました/);
   assert.match(apiClient, /summaryFromRecord/);
   assert.match(apiClient, /createReleaseCopy/);
   assert.match(apiClient, /projectNumber: release\.projectNumber \|\| version \|\| ""/);
@@ -123,6 +134,26 @@ test("SPA contains editable release-operation controls", async () => {
   assert.match(apiClient, /APIサーバーのresourcesにcategoriesを追加してください/);
   assert.doesNotMatch(apiClient, /JSON\.stringify\(\{ \.\.\.input, id: 0 \}\)/);
   assert.match(html, /Release Hub \| リリース情報をひとつに/);
+});
+
+test("partial release updates preserve timeline and other detail arrays", async (context) => {
+  const baseUrl = await startServer(context);
+  const created = await createRelease(baseUrl);
+  created.timeline = [{ id: 1, startAt: "2026-08-01T22:00", endAt: "2026-08-01T22:30", title: "本番デプロイ", owner: "山田", status: "未着手", plan: "本線" }];
+  created.staffing = [{ id: 1, name: "山田", phone: "", startAt: "2026-08-01T21:00", endAt: "2026-08-02T01:00", location: "オンコール", note: "" }];
+  const saved = (await saveRelease(baseUrl, created)).body;
+
+  const approvalPatch = await patchRelease(baseUrl, saved.id, {
+    approvals: [{ id: 1, title: "本番変更申請", category: "WF", owner: "山田", due: "2026-08-01", status: "未申請", url: "" }],
+  });
+  assert.equal(approvalPatch.response.status, 200);
+  assert.equal(approvalPatch.body.timeline.length, 1);
+  assert.equal(approvalPatch.body.timeline[0].title, "本番デプロイ");
+  assert.equal(approvalPatch.body.staffing.length, 1);
+
+  const reloaded = await requestJson(`${baseUrl}/v2/releases/${saved.id}`);
+  assert.equal(reloaded.body.timeline.length, 1);
+  assert.equal(reloaded.body.approvals.length, 1);
 });
 
 test("GitHub Pages workflow builds the demo with required deployment settings", async () => {

@@ -157,6 +157,9 @@ npm test
 | FT-071 | 同名の申請種別を追加する | 重複エラーを表示して保存しない |
 | FT-072 | 申請物を追加・編集する | 申請種別をマスタ候補から選択または自由入力できる |
 | FT-073 | `?view=approval-categories`を開く | 申請種別管理画面を直接表示する |
+| FT-074 | Timelineを含む作業で申請物・体制など別項目を保存する | 変更項目だけをPATCHし、既存Timelineを保持する |
+| FT-075 | ドラッグや状態変更を連続操作する | 保存要求が操作順に処理され、後着レスポンスで新しい画面状態を戻さない |
+| FT-076 | 既存Timelineが意図せず空になる保存を試行する | 保存を中止して再読み込みを促すエラーを表示する |
 
 ## 7. API試験
 
@@ -176,6 +179,7 @@ npm test
 | API-012 | CORS設定ありのOPTIONS | 200と許可ヘッダー |
 | API-013 | GET/POST/PUT/DELETE `/v2/categories` | 異なるscopeのカテゴリを一覧・作成・更新・削除できる |
 | API-014 | 旧`approval-categories.json`で起動 | 各要素へ`scope=approval`を付けて`categories.json`へ移行する |
+| API-015 | PATCH `/v2/releases/:id` でapprovalsだけを更新する | timeline、staffing、linksを変更せず保持する |
 
 ## 8. データ移行試験
 
